@@ -4,11 +4,23 @@
 # pip install langchain-openai python-dotenv pandas openpyxl
 
 import os
+import sys
 import pandas as pd
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
-from langchain.schema import SystemMessage, HumanMessage
+from langchain_core.messages import SystemMessage, HumanMessage
 import json
+
+# Configurar encoding UTF-8 para Windows
+if sys.platform == 'win32':
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+    except (AttributeError, ValueError):
+        # Fallback para versões antigas do Python ou casos onde reconfigure não está disponível
+        import io
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
 # Carrega as variáveis de ambiente do ficheiro .env
 load_dotenv()
@@ -47,17 +59,41 @@ Use os seguintes princípios para a sua análise:
         resposta = llm.invoke([system_message, human_message])
         print(f"{LOG_PREFIX} Resposta bruta da IA recebida (primeiros 200 caracteres): {resposta.content[:200]}...")
         
-        json_string = resposta.content.strip().replace("```json", "").replace("```", "")
+        # Extrair JSON da resposta, removendo markdown code blocks se presentes
+        json_string = resposta.content.strip()
+        # Remover code blocks markdown (```json ... ``` ou ``` ... ```)
+        if json_string.startswith("```"):
+            lines = json_string.split("\n")
+            # Remover primeira linha (```json ou ```)
+            if lines[0].startswith("```"):
+                lines = lines[1:]
+            # Remover última linha (```)
+            if lines and lines[-1].strip() == "```":
+                lines = lines[:-1]
+            json_string = "\n".join(lines)
+        
         dados_priorizados = json.loads(json_string)
+        
+        # Validação: verificar se a resposta é uma lista
+        if not isinstance(dados_priorizados, list):
+            print(f"❌ ERRO CRÍTICO: A IA retornou um formato inválido. Esperava uma lista, recebeu: {type(dados_priorizados)}")
+            return None
+        
+        if len(dados_priorizados) == 0:
+            print(f"❌ ERRO CRÍTICO: A IA retornou uma lista vazia.")
+            return None
         
         print(f"✅ Análise estratégica da IA concluída com sucesso! {len(dados_priorizados)} itens retornados.")
         return pd.DataFrame(dados_priorizados)
     except json.JSONDecodeError as e:
         print(f"❌ ERRO CRÍTICO: A IA não retornou um JSON válido. Ocorreu um erro de descodificação: {e}")
-        print(f"{LOG_PREFIX} Resposta completa que causou o erro:\n{resposta.content}")
+        if 'resposta' in locals() and hasattr(resposta, 'content'):
+            print(f"{LOG_PREFIX} Resposta completa que causou o erro:\n{resposta.content}")
         return None
     except Exception as e:
         print(f"❌ Erro ao obter a priorização da IA: {e}")
+        import traceback
+        print(f"{LOG_PREFIX} Detalhes do erro:\n{traceback.format_exc()}")
         return None
 
 def processar_roadmap(caminho_arquivo_csv, capacidade_iniciativas):
@@ -82,6 +118,11 @@ def processar_roadmap(caminho_arquivo_csv, capacidade_iniciativas):
         df_iniciativas.columns = df_iniciativas.columns.str.strip().str.lower()
         print(f"{LOG_PREFIX} Nomes das colunas normalizados.")
         print(f"{LOG_PREFIX} Colunas detetadas: {df_iniciativas.columns.tolist()}")
+        
+        # Validação: verificar se o DataFrame não está vazio
+        if df_iniciativas.empty:
+            print(f"❌ ERRO CRÍTICO: O ficheiro '{caminho_arquivo_csv}' está vazio ou não contém dados válidos.")
+            return None
 
         # --- 2. Obter a Ordem de Prioridade e Justificativas da IA ---
         print(f"\n--- Passo 2: Análise Estratégica da IA ---")
@@ -89,7 +130,11 @@ def processar_roadmap(caminho_arquivo_csv, capacidade_iniciativas):
         
         if df_iniciativas_priorizadas is None:
             print("❌ Processo interrompido devido a um erro na análise da IA.")
-            return
+            return None
+        
+        if df_iniciativas_priorizadas.empty:
+            print("❌ ERRO CRÍTICO: A IA retornou um DataFrame vazio.")
+            return None
 
         df_iniciativas_priorizadas.columns = df_iniciativas_priorizadas.columns.str.strip().str.lower()
         print(f"{LOG_PREFIX} Colunas da resposta da IA normalizadas.")
@@ -97,23 +142,29 @@ def processar_roadmap(caminho_arquivo_csv, capacidade_iniciativas):
 
         # --- 3. Alocação de Capacidade e Atualização da Justificativa ---
         print(f"\n--- Passo 3: Alocação de Capacidade ---")
-        horas_alocadas = 0
-        status_list = []
-        for index, row in df_iniciativas_priorizadas.iterrows():
-            horas_item = pd.to_numeric(row['horas'], errors='coerce')
-            if pd.isna(horas_item): horas_item = 0
-
-            if (horas_alocadas + horas_item) <= capacidade_iniciativas:
-                status_list.append('Priorizado')
-                horas_alocadas += horas_item
-            else:
-                status_list.append('Despriorizado')
-                # ATUALIZADO: Mantém a justificativa original e adiciona a nota de capacidade.
-                justificativa_original = row.get('justificativa', "Item de valor estratégico.")
-                nova_justificativa = f"{justificativa_original} No entanto, foi despriorizado por falta de capacidade neste trimestre."
-                df_iniciativas_priorizadas.loc[index, 'justificativa'] = nova_justificativa
         
-        df_iniciativas_priorizadas['status'] = status_list
+        # Validação: verificar se a coluna 'horas' existe
+        if 'horas' not in df_iniciativas_priorizadas.columns:
+            print(f"❌ ERRO CRÍTICO: A coluna 'horas' não foi encontrada no DataFrame retornado pela IA.")
+            print(f"{LOG_PREFIX} Colunas disponíveis: {df_iniciativas_priorizadas.columns.tolist()}")
+            return None
+        
+        # Converter coluna 'horas' para numérico de forma vetorizada
+        df_iniciativas_priorizadas['horas'] = pd.to_numeric(df_iniciativas_priorizadas['horas'], errors='coerce').fillna(0)
+        
+        # Calcular status de forma vetorizada
+        horas_cumulativas = df_iniciativas_priorizadas['horas'].cumsum()
+        df_iniciativas_priorizadas['status'] = (horas_cumulativas <= capacidade_iniciativas).map({True: 'Priorizado', False: 'Despriorizado'})
+        
+        # Atualizar justificativas para itens despriorizados
+        mask_despriorizado = df_iniciativas_priorizadas['status'] == 'Despriorizado'
+        if mask_despriorizado.any():
+            df_iniciativas_priorizadas.loc[mask_despriorizado, 'justificativa'] = (
+                df_iniciativas_priorizadas.loc[mask_despriorizado, 'justificativa'].fillna("Item de valor estratégico.") +
+                " No entanto, foi despriorizado por falta de capacidade neste trimestre."
+            )
+        
+        horas_alocadas = df_iniciativas_priorizadas[df_iniciativas_priorizadas['status'] == 'Priorizado']['horas'].sum()
         print("✅ Status definido e justificativas de capacidade atualizadas.")
         print(f"{LOG_PREFIX} Total de horas alocadas para iniciativas: {horas_alocadas} / {capacidade_iniciativas}")
 
@@ -130,6 +181,9 @@ def processar_roadmap(caminho_arquivo_csv, capacidade_iniciativas):
             ascending=[False, True]
         )
         print("✅ Relatório final ordenado por Status.")
+        
+        # Resetar índice após ordenação
+        df_iniciativas_priorizadas.reset_index(drop=True, inplace=True)
 
         # --- 5. Gerar o Ficheiro Excel Final ---
         print(f"\n--- Passo 5: Gerar Ficheiro Excel ---")
