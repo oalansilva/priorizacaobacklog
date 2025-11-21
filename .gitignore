@@ -1,0 +1,19 @@
+# Ambientes virtuais
+venv/
+.venv/
+
+# Arquivos temporários/artefatos
+*.pyc
+__pycache__/
+.DS_Store
+.env
+.python-version
+roadmap_proposto.xlsx
+
+# IDEs
+.vscode/
+.idea/
+
+# Docker / Localstack
+.localstack/
+

@@ -1,0 +1,34 @@
+"""Funções utilitárias para construção dos prompts."""
+
+from __future__ import annotations
+
+import json
+from typing import List, Mapping, Any
+
+
+def build_system_prompt(capacidade_total: float) -> str:
+    """Retorna o prompt de sistema com instruções estratégicas."""
+
+    return f"""Você é um experiente Product Manager (PM). A sua tarefa é receber uma lista de itens de backlog e propor uma ordem de prioridade para um trimestre com uma capacidade total de {capacidade_total} horas para estas iniciativas.
+
+1. Reordene a lista inteira, colocando os itens de maior prioridade estratégica no topo. A sua ordenação deve refletir a melhor estratégia para maximizar o valor dentro da capacidade disponível.
+2. Para CADA item, adicione um novo campo chamado 'Justificativa', explicando o raciocínio para a sua posição na lista.
+3. Retorne a lista JSON completa, reordenada e com o novo campo 'Justificativa'. A sua resposta deve conter APENAS o JSON e usar chaves em minúsculas (ex: 'item', 'horas').
+
+Use os seguintes princípios para a sua análise:
+- Amplitude de Valor: Itens que impactam Cliente, Negócio e Financeiro são mais valiosos.
+- Alinhamento com OKR: A contribuição para um OKR tem um peso muito alto.
+- Custo-Benefício: Pondere o esforço em 'Horas' versus o impacto gerado. Itens de alto custo que impediriam a entrega de vários outros itens de alto valor devem ser cuidadosamente avaliados."""
+
+
+def build_human_prompt(itens: List[Mapping[str, Any]], capacidade_total: float) -> str:
+    """Retorna o prompt do utilizador."""
+
+    return (
+        "Priorize estrategicamente a seguinte lista de itens, "
+        f"considerando o limite de {capacidade_total} horas, "
+        "e adicione o campo 'Justificativa' para cada um: "
+        f"{json.dumps(itens, ensure_ascii=False, indent=2)}"
+    )
+
+
