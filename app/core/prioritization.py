@@ -119,18 +119,40 @@ class PrioritizationService:
 
     def _clean_dataframe(self, dataframe: pd.DataFrame) -> pd.DataFrame:
         df = dataframe.copy()
+        
+        # Remover linhas e colunas totalmente vazias
         df.dropna(axis=1, how="all", inplace=True)
+        df.dropna(axis=0, how="all", inplace=True)
+        
         df.columns = df.columns.str.strip().str.lower()
         
-        # Normalizar colunas de esforço para 'horas'
+        # Normalizar colunas
         mapeamento = {
+            # Esforço
             "esforco estimado": "horas",
             "esforco": "horas",
             "effort": "horas",
             "hours": "horas",
-            "estimativa": "horas"
+            "estimativa": "horas",
+            # Item
+            "titulo": "item",
+            "title": "item",
+            "nome": "item",
+            "name": "item",
+            "descricao": "item",
+            # Impactos
+            "impacto em negócios": "negocio",
+            "impacto negocio": "negocio",
+            "valor de negocio": "negocio",
+            "impacto cliente": "cliente",
+            "impacto financeiro": "financeiro"
         }
         df.rename(columns=mapeamento, inplace=True)
+        
+        # Garantir que temos a coluna item e remover linhas sem item
+        if "item" in df.columns:
+            df = df[df["item"].notna() & (df["item"] != "")]
+            
         return df
 
     def _calcular_capacidade_iniciativas(
