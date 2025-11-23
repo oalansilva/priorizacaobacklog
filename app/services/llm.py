@@ -36,6 +36,7 @@ def get_llm(settings: Optional[Settings] = None) -> BaseChatModel:
             region_name=cfg.aws_region,
             credentials_profile_name=cfg.aws_profile,
             temperature=cfg.temperature,
+            model_kwargs={"max_tokens": 8192},
         )
 
     if provider == "openai":
