@@ -121,6 +121,16 @@ class PrioritizationService:
         df = dataframe.copy()
         df.dropna(axis=1, how="all", inplace=True)
         df.columns = df.columns.str.strip().str.lower()
+        
+        # Normalizar colunas de esforço para 'horas'
+        mapeamento = {
+            "esforco estimado": "horas",
+            "esforco": "horas",
+            "effort": "horas",
+            "hours": "horas",
+            "estimativa": "horas"
+        }
+        df.rename(columns=mapeamento, inplace=True)
         return df
 
     def _calcular_capacidade_iniciativas(

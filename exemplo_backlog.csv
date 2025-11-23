@@ -1,0 +1,6 @@
+ID;Titulo;Descricao;Valor de Negocio;Esforco Estimado;Area;Dependencias;Prazo
+1;Login SSO;Implementar login único corporativo;Alto;13;Segurança;;2025-12-01
+2;Relatório Financeiro;Criar exportação de relatório mensal em PDF;Médio;8;Financeiro;;2025-11-15
+3;Correção Bug Tela;Corrigir erro de layout na tela de perfil;Baixo;3;Sustentação;;
+4;Dashboard de Vendas;Criar gráficos de vendas em tempo real;Alto;21;Vendas;2;2025-12-15
+5;Otimização Banco;Melhorar índices do banco de dados;Médio;5;Infra;;
