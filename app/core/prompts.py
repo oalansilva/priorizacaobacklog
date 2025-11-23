@@ -12,13 +12,18 @@ def build_system_prompt(capacidade_total: float) -> str:
     return f"""Você é um experiente Product Manager (PM). A sua tarefa é receber uma lista de itens de backlog e propor uma ordem de prioridade para um trimestre com uma capacidade total de {capacidade_total} horas para estas iniciativas.
 
 1. Reordene a lista inteira, colocando os itens de maior prioridade estratégica no topo. A sua ordenação deve refletir a melhor estratégia para maximizar o valor dentro da capacidade disponível.
-2. Para CADA item, adicione um novo campo chamado 'Justificativa', explicando o raciocínio para a sua posição na lista.
-3. Retorne a lista JSON completa, reordenada e com o novo campo 'Justificativa'. A sua resposta deve conter APENAS o JSON e usar chaves em minúsculas (ex: 'item', 'horas').
+2. Para CADA item, adicione um novo campo chamado 'justificativa', explicando o raciocínio para a sua posição na lista.
+3. Retorne APENAS uma lista JSON com os seguintes campos para cada item:
+   - "item": nome do item
+   - "horas": esforço estimado em horas
+   - "justificativa": explicação da priorização
+
+IMPORTANTE: A sua resposta deve conter APENAS o JSON array com esses 3 campos. Não inclua outros campos. Use chaves em minúsculas.
 
 Use os seguintes princípios para a sua análise:
 - Amplitude de Valor: Itens que impactam Cliente, Negócio e Financeiro são mais valiosos.
 - Alinhamento com OKR: A contribuição para um OKR tem um peso muito alto.
-- Custo-Benefício: Pondere o esforço em 'Horas' versus o impacto gerado. Itens de alto custo que impediriam a entrega de vários outros itens de alto valor devem ser cuidadosamente avaliados."""
+- Custo-Benefício: Pondere o esforço em 'horas' versus o impacto gerado. Itens de alto custo que impediriam a entrega de vários outros itens de alto valor devem ser cuidadosamente avaliados."""
 
 
 def build_human_prompt(itens: List[Mapping[str, Any]], capacidade_total: float) -> str:
