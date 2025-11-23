@@ -110,12 +110,12 @@ async def healthcheck() -> dict[str, str]:
     "/priorizacoes",
     response_model=PrioritizationResponse,
     tags=["Priorização"],
+    dependencies=[Depends(enforce_api_key)],
 )
 async def priorizar_backlog(
     request: Request,
+    response: Response,
     service: PrioritizationService = Depends(get_service),
-    _auth: None = Depends(enforce_api_key),
-    _rate: None = Depends(rate_limit_dependency),
     file: Optional[UploadFile] = File(
         default=None, description="CSV contendo as demandas."
     ),
@@ -133,6 +133,9 @@ async def priorizar_backlog(
     - Content-Type `application/json`: enviar `PrioritizationRequest`.
     - Content-Type `multipart/form-data`: enviar arquivo CSV em `file`.
     """
+
+    # Aplicar rate limiting
+    await rate_limit_dependency(request, response, None)
 
     content_type = request.headers.get("content-type", "")
 

@@ -149,16 +149,47 @@ class PrioritizationService:
         return resultado
 
     def _parse_llm_response(self, content: str) -> Any:
+        """Parse LLM response, extracting JSON from markdown code blocks if present."""
         texto = content.strip()
-        if texto.startswith("```"):
-            linhas = texto.split("\n")
-            if linhas[0].startswith("```"):
-                linhas = linhas[1:]
-            if linhas and linhas[-1].strip() == "```":
-                linhas = linhas[:-1]
-            texto = "\n".join(linhas)
-
-        return json.loads(texto)
+        
+        # Try to extract JSON from markdown code block
+        if "```" in texto:
+            # Find content between ``` markers
+            import re
+            # Match ```json or ``` followed by content and closing ```
+            pattern = r'```(?:json)?\s*\n(.*?)\n```'
+            match = re.search(pattern, texto, re.DOTALL)
+            if match:
+                texto = match.group(1).strip()
+            else:
+                # Fallback: remove first and last lines if they contain ```
+                linhas = texto.split("\n")
+                if linhas[0].strip().startswith("```"):
+                    linhas = linhas[1:]
+                if linhas and linhas[-1].strip() == "```":
+                    linhas = linhas[:-1]
+                texto = "\n".join(linhas).strip()
+        
+        # Try to find JSON array or object if there's extra text
+        if not texto.startswith(("[", "{")):
+            import re
+            # Try to find a JSON array or object
+            json_match = re.search(r'(\[.*\]|\{.*\})', texto, re.DOTALL)
+            if json_match:
+                texto = json_match.group(1)
+        
+        try:
+            return json.loads(texto)
+        except json.JSONDecodeError as e:
+            self.logger.error(
+                "json_parse_error",
+                error=str(e),
+                content_preview=texto[:500] if len(texto) > 500 else texto
+            )
+            raise ValueError(
+                f"Não foi possível fazer parse da resposta do LLM. "
+                f"Erro: {e}. Preview: {texto[:200]}..."
+            )
 
     def _aplicar_status_e_prioridade(
         self, df: pd.DataFrame, capacidade_iniciativas: float

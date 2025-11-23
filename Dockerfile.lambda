@@ -1,0 +1,33 @@
+# Estágio 1: Build das dependências
+FROM python:3.11-slim AS builder
+
+# Instalar ferramentas de compilação
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Instalar dependências Python
+COPY requirements-lambda.txt requirements.txt
+# Forçar o uso de wheels compatíveis com Amazon Linux (manylinux2014_x86_64)
+RUN pip install \
+    --platform manylinux2014_x86_64 \
+    --implementation cp \
+    --python-version 3.11 \
+    --only-binary=:all: \
+    --upgrade \
+    --target /python \
+    -r requirements.txt
+
+# Estágio 2: Imagem Lambda final
+FROM public.ecr.aws/lambda/python:3.11
+
+# Copiar dependências do builder
+COPY --from=builder /python/ ${LAMBDA_TASK_ROOT}/
+
+# Copiar código da aplicação
+COPY app/ ${LAMBDA_TASK_ROOT}/app/
+COPY main_lambda.py ${LAMBDA_TASK_ROOT}/main_lambda.py
+
+# Definir o handler
+CMD ["main_lambda.handler"]
