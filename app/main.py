@@ -16,8 +16,10 @@ from fastapi import (
     Response,
     UploadFile,
 )
-from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse, FileResponse
 from fastapi.routing import APIRoute
+from fastapi.middleware.cors import CORSMiddleware
 
 try:
     import redis.asyncio as redis
@@ -36,6 +38,7 @@ from app.core.prioritization import PrioritizationService
 from app.logging import get_logger
 from app.models import PrioritizationRequest, PrioritizationResponse
 from app.security import enforce_api_key
+from app.api import chat, items
 
 logger = get_logger(__name__)
 
@@ -51,6 +54,24 @@ app = FastAPI(
     version="0.1.0",
     description="API para priorização de demandas com AWS Bedrock + LangChain.",
 )
+
+app.include_router(chat.router)
+app.include_router(items.router)
+
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # In production, specify exact origins
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
+
+@app.get("/", include_in_schema=False)
+async def read_root():
+    return FileResponse("app/static/index.html")
 
 
 @app.on_event("startup")

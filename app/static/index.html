@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gênio Priorizador de Backlog</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        .chat-scroll::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .chat-scroll::-webkit-scrollbar-thumb {
+            background-color: #cbd5e1;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+
+<body class="bg-slate-50 h-screen flex flex-col">
+
+    <div id="root" class="h-full flex flex-col"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        function App() {
+            const [activeTab, setActiveTab] = useState('chat'); // 'chat' or 'backlog'
+
+            return (
+                <div className="flex flex-col h-full max-w-5xl mx-auto w-full bg-white shadow-xl overflow-hidden">
+                    <header className="bg-indigo-600 text-white p-4 flex justify-between items-center shrink-0">
+                        <h1 className="text-xl font-bold flex items-center gap-2">
+                            🤖 Gênio Priorizador
+                        </h1>
+                        <nav className="flex gap-4">
+                            <button
+                                onClick={() => setActiveTab('chat')}
+                                className={`px-3 py-1 rounded ${activeTab === 'chat' ? 'bg-indigo-800' : 'hover:bg-indigo-700'}`}
+                            >
+                                Chat
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('backlog')}
+                                className={`px-3 py-1 rounded ${activeTab === 'backlog' ? 'bg-indigo-800' : 'hover:bg-indigo-700'}`}
+                            >
+                                Backlog
+                            </button>
+                        </nav>
+                    </header>
+
+                    <main className="flex-1 overflow-hidden relative">
+                        {activeTab === 'chat' ? <ChatInterface /> : <BacklogBoard />}
+                    </main>
+                </div>
+            );
+        }
+
+        function ChatInterface() {
+            const [messages, setMessages] = useState([]);
+            const [input, setInput] = useState('');
+            const [loading, setLoading] = useState(false);
+            const scrollRef = useRef(null);
+            const [conversationId, setConversationId] = useState(null);
+
+            useEffect(() => {
+                if (scrollRef.current) {
+                    scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+                }
+            }, [messages]);
+
+            const sendMessage = async () => {
+                if (!input.trim()) return;
+
+                const userMsg = { role: 'user', content: input };
+                setMessages(prev => [...prev, userMsg]);
+                setInput('');
+                setLoading(true);
+
+                try {
+                    const response = await axios.post('/chat/', {
+                        message: userMsg.content,
+                        conversation_id: conversationId
+                    });
+
+                    const botMsg = { role: 'assistant', content: response.data.response };
+                    setMessages(prev => [...prev, botMsg]);
+                    setConversationId(response.data.conversation_id);
+                } catch (error) {
+                    console.error("Erro no chat:", error);
+                    console.error("Detalhes do erro:", error.response?.data);
+                    console.error("Status:", error.response?.status);
+                    const errorMsg = error.response?.data?.detail || "Desculpe, ocorreu um erro ao processar sua mensagem.";
+                    setMessages(prev => [...prev, { role: 'assistant', content: errorMsg }]);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            return (
+                <div className="flex flex-col h-full">
+                    <div className="flex-1 overflow-y-auto p-4 space-y-4 chat-scroll" ref={scrollRef}>
+                        {messages.length === 0 && (
+                            <div className="text-center text-gray-400 mt-10">
+                                <p>Olá! Sou seu assistente de backlog.</p>
+                                <p className="text-sm">Peça para eu adicionar itens ou priorizar seu backlog.</p>
+                            </div>
+                        )}
+                        {messages.map((msg, idx) => (
+                            <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                <div className={`max-w-[80%] p-3 rounded-lg ${msg.role === 'user' ? 'bg-indigo-100 text-indigo-900' : 'bg-gray-100 text-gray-800'}`}>
+                                    <p className="whitespace-pre-wrap">{msg.content}</p>
+                                </div>
+                            </div>
+                        ))}
+                        {loading && (
+                            <div className="flex justify-start">
+                                <div className="bg-gray-100 p-3 rounded-lg">
+                                    <span className="animate-pulse">Thinking...</span>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                    <div className="p-4 border-t bg-gray-50 shrink-0">
+                        <div className="flex gap-2">
+                            <input
+                                type="text"
+                                className="flex-1 border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                placeholder="Digite sua mensagem..."
+                                value={input}
+                                onChange={(e) => setInput(e.target.value)}
+                                onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+                                disabled={loading}
+                            />
+                            <button
+                                onClick={sendMessage}
+                                disabled={loading}
+                                className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                            >
+                                Enviar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function BacklogBoard() {
+            const [items, setItems] = useState([]);
+            const [loading, setLoading] = useState(true);
+
+            const fetchItems = async () => {
+                try {
+                    const response = await axios.get('/items/');
+                    setItems(response.data);
+                } catch (error) {
+                    console.error("Erro ao buscar itens:", error);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            useEffect(() => {
+                fetchItems();
+            }, []);
+
+            if (loading) return <div className="p-10 text-center">Carregando backlog...</div>;
+
+            return (
+                <div className="h-full overflow-y-auto p-6 bg-gray-50">
+                    <div className="flex justify-between items-center mb-6">
+                        <h2 className="text-2xl font-bold text-gray-800">Backlog de Demandas</h2>
+                        <button onClick={fetchItems} className="text-indigo-600 hover:text-indigo-800 text-sm">Atualizar</button>
+                    </div>
+
+                    {items.length === 0 ? (
+                        <div className="text-center text-gray-500 py-10 border-2 border-dashed rounded-lg">
+                            O backlog está vazio. Use o chat para adicionar itens.
+                        </div>
+                    ) : (
+                        <div className="grid gap-4">
+                            {items.map(item => (
+                                <div key={item.id} className="bg-white p-4 rounded-lg shadow border-l-4 border-indigo-500 hover:shadow-md transition-shadow">
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <h3 className="font-bold text-lg text-gray-900">{item.titulo}</h3>
+                                            <p className="text-gray-600 mt-1">{item.descricao}</p>
+                                        </div>
+                                        <span className={`px-2 py-1 rounded text-xs font-bold ${item.status === 'Priorizado' ? 'bg-green-100 text-green-800' :
+                                                item.status === 'Despriorizado' ? 'bg-red-100 text-red-800' :
+                                                    'bg-blue-100 text-blue-800'
+                                            }`}>
+                                            {item.status}
+                                        </span>
+                                    </div>
+                                    <div className="mt-4 flex gap-4 text-sm text-gray-500">
+                                        <span className="flex items-center gap-1">
+                                            📊 Valor: <span className="font-medium text-gray-700">{item.valor_negocio}</span>
+                                        </span>
+                                        <span className="flex items-center gap-1">
+                                            ⏱️ Esforço: <span className="font-medium text-gray-700">{item.esforco_estimado}h</span>
+                                        </span>
+                                        <span className="flex items-center gap-1">
+                                            📁 Área: <span className="font-medium text-gray-700">{item.area}</span>
+                                        </span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+
+</html>

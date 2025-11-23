@@ -6,7 +6,10 @@ import os
 from functools import lru_cache
 from typing import Optional
 
+from dotenv import load_dotenv
 from pydantic import BaseModel, Field, field_validator
+
+load_dotenv()
 
 
 class Settings(BaseModel):
