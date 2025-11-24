@@ -4,6 +4,7 @@ function BacklogBoard() {
     const [items, setItems] = useState([]);
     const [loading, setLoading] = useState(true);
     const [editingItem, setEditingItem] = useState(null);
+    const [viewingJustification, setViewingJustification] = useState(null);
 
     const fetchItems = async () => {
         try {
@@ -45,10 +46,26 @@ function BacklogBoard() {
         fetchItems();
     }, []);
 
+    // Calculate statistics
+    const stats = {
+        priorizados: {
+            count: items.filter(i => i.status === 'Priorizado').length,
+            hours: items.filter(i => i.status === 'Priorizado').reduce((sum, i) => sum + (i.esforco_estimado || 0), 0)
+        },
+        despriorizados: {
+            count: items.filter(i => i.status === 'Despriorizado').length,
+            hours: items.filter(i => i.status === 'Despriorizado').reduce((sum, i) => sum + (i.esforco_estimado || 0), 0)
+        },
+        novos: {
+            count: items.filter(i => i.status === 'Novo').length,
+            hours: items.filter(i => i.status === 'Novo').reduce((sum, i) => sum + (i.esforco_estimado || 0), 0)
+        }
+    };
+
     if (loading) return <div className="p-10 text-center">Carregando backlog...</div>;
 
     return (
-        <div className="h-full overflow-y-auto p-6 bg-gray-50 relative">
+        <div className="h-full overflow-y-auto p-4 bg-gray-50 relative">
             {editingItem && (
                 <EditItemModal
                     item={editingItem}
@@ -57,30 +74,103 @@ function BacklogBoard() {
                 />
             )}
 
-            <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-gray-800">Backlog de Demandas</h2>
-                <button onClick={fetchItems} className="text-indigo-600 hover:text-indigo-800 text-sm">Atualizar</button>
+            {viewingJustification && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+                        <div className="p-4 border-b border-gray-200 flex justify-between items-start">
+                            <div>
+                                <h3 className="text-lg font-bold text-gray-900">{viewingJustification.titulo}</h3>
+                                <span className={`inline-block mt-1 px-2 py-0.5 rounded text-xs font-semibold ${viewingJustification.status === 'Priorizado' ? 'bg-green-100 text-green-800' :
+                                    viewingJustification.status === 'Despriorizado' ? 'bg-red-100 text-red-800' :
+                                        'bg-blue-100 text-blue-800'
+                                    }`}>
+                                    {viewingJustification.status}
+                                </span>
+                            </div>
+                            <button
+                                onClick={() => setViewingJustification(null)}
+                                className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
+                            >
+                                ×
+                            </button>
+                        </div>
+                        <div className="p-4">
+                            <h4 className="font-semibold text-gray-700 mb-2">Justificativa:</h4>
+                            <p className="text-gray-600 whitespace-pre-wrap">
+                                {viewingJustification.justificativa || 'Nenhuma justificativa disponível.'}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <div className="sticky top-0 bg-gray-50 z-10 pb-3">
+                <div className="flex justify-between items-center mb-3">
+                    <h2 className="text-xl font-bold text-gray-800">Backlog de Demandas</h2>
+                    <button onClick={fetchItems} className="text-indigo-600 hover:text-indigo-800 text-sm font-medium">Atualizar</button>
+                </div>
+
+                {/* Summary Statistics */}
+                <div className="grid grid-cols-3 gap-2 mb-2">
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-2">
+                        <div className="text-xs font-medium text-green-700 mb-0.5">✅ Priorizados</div>
+                        <div className="flex items-baseline gap-2">
+                            <span className="text-lg font-bold text-green-900">{stats.priorizados.count}</span>
+                            <span className="text-xs text-green-600">{stats.priorizados.hours}h</span>
+                        </div>
+                    </div>
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-2">
+                        <div className="text-xs font-medium text-red-700 mb-0.5">❌ Despriorizados</div>
+                        <div className="flex items-baseline gap-2">
+                            <span className="text-lg font-bold text-red-900">{stats.despriorizados.count}</span>
+                            <span className="text-xs text-red-600">{stats.despriorizados.hours}h</span>
+                        </div>
+                    </div>
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-2">
+                        <div className="text-xs font-medium text-blue-700 mb-0.5">🆕 Novos</div>
+                        <div className="flex items-baseline gap-2">
+                            <span className="text-lg font-bold text-blue-900">{stats.novos.count}</span>
+                            <span className="text-xs text-blue-600">{stats.novos.hours}h</span>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             {items.length === 0 ? (
-                <div className="text-center text-gray-500 py-10 border-2 border-dashed rounded-lg">
+                <div className="text-center text-gray-500 py-8 border-2 border-dashed rounded-lg">
                     O backlog está vazio. Use o chat para adicionar itens.
                 </div>
             ) : (
-                <div className="grid gap-4">
+                <div className="grid gap-2">
                     {items.map(item => (
-                        <div key={item.id} className="bg-white p-4 rounded-lg shadow border-l-4 border-indigo-500 hover:shadow-md transition-shadow group">
-                            <div className="flex justify-between items-start">
-                                <div className="flex-1">
-                                    <div className="flex justify-between items-start">
-                                        <h3 className="font-bold text-lg text-gray-900">{item.titulo}</h3>
-                                        <div className="flex items-center gap-2">
-                                            <span className={`px-2 py-1 rounded text-xs font-bold ${item.status === 'Priorizado' ? 'bg-green-100 text-green-800' :
+                        <div key={item.id} className="bg-white p-3 rounded-lg shadow-sm border-l-4 border-indigo-500 hover:shadow-md transition-shadow">
+                            <div className="flex justify-between items-start gap-3">
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex justify-between items-start gap-2 mb-1">
+                                        <h3 className="font-bold text-base text-gray-900 truncate flex-1">
+                                            {item.status === 'Priorizado' && item.prioridade < 999 ? (
+                                                <span className="mr-2 inline-flex items-center justify-center w-6 h-6 bg-indigo-100 text-indigo-800 text-xs font-bold rounded-full">
+                                                    #{item.prioridade}
+                                                </span>
+                                            ) : null}
+                                            {item.titulo}
+                                        </h3>
+                                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                                            <span className={`px-2 py-0.5 rounded text-xs font-semibold ${item.status === 'Priorizado' ? 'bg-green-100 text-green-800' :
                                                 item.status === 'Despriorizado' ? 'bg-red-100 text-red-800' :
                                                     'bg-blue-100 text-blue-800'
                                                 }`}>
                                                 {item.status}
                                             </span>
+                                            {item.justificativa && (
+                                                <button
+                                                    onClick={() => setViewingJustification(item)}
+                                                    className="text-gray-400 hover:text-blue-600 p-1 rounded hover:bg-blue-50 transition-colors"
+                                                    title="Ver Justificativa"
+                                                >
+                                                    💬
+                                                </button>
+                                            )}
                                             <button
                                                 onClick={() => setEditingItem(item)}
                                                 className="text-gray-400 hover:text-indigo-600 p-1 rounded hover:bg-indigo-50 transition-colors"
@@ -97,43 +187,40 @@ function BacklogBoard() {
                                             </button>
                                         </div>
                                     </div>
-                                    <p className="text-gray-600 mt-1">{item.descricao}</p>
-                                    {item.justificativa && (
-                                        <div className="mt-2 p-2 bg-gray-50 border border-gray-200 rounded text-sm text-gray-700 italic">
-                                            <span className="font-semibold not-italic">Justificativa:</span> {item.justificativa}
-                                        </div>
-                                    )}
+                                    <p className="text-gray-600 text-sm line-clamp-1 mb-2">{item.descricao}</p>
+
+                                    <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-600 mb-2">
+                                        <span className="flex items-center gap-1">
+                                            ⏱️ <span className="font-medium text-gray-700">{item.esforco_estimado}h</span>
+                                        </span>
+                                        <span className="flex items-center gap-1">
+                                            📁 <span className="font-medium text-gray-700">{item.area}</span>
+                                        </span>
+                                        {item.categoria && (
+                                            <span className="flex items-center gap-1">
+                                                🏷️ <span className="font-medium text-gray-700">{item.categoria}</span>
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {item.impacto_financeiro === 'Sim' && (
+                                            <span className="px-1.5 py-0.5 bg-green-50 text-green-700 rounded text-xs font-medium">💰 Financeiro</span>
+                                        )}
+                                        {item.impacto_negocios === 'Sim' && (
+                                            <span className="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-xs font-medium">📈 Negócios</span>
+                                        )}
+                                        {item.impacto_cliente === 'Sim' && (
+                                            <span className="px-1.5 py-0.5 bg-purple-50 text-purple-700 rounded text-xs font-medium">👥 Cliente</span>
+                                        )}
+                                        {item.okr === 'Sim' && (
+                                            <span className="px-1.5 py-0.5 bg-yellow-50 text-yellow-700 rounded text-xs font-medium">🎯 OKR</span>
+                                        )}
+                                        {item.estimado_qp === 'Sim' && (
+                                            <span className="px-1.5 py-0.5 bg-indigo-50 text-indigo-700 rounded text-xs font-medium">📋 QP</span>
+                                        )}
+                                    </div>
                                 </div>
-                            </div>
-                            <div className="mt-4 flex gap-4 text-sm text-gray-500">
-                                <span className="flex items-center gap-1">
-                                    ⏱️ Esforço: <span className="font-medium text-gray-700">{item.esforco_estimado}h</span>
-                                </span>
-                                <span className="flex items-center gap-1">
-                                    📁 Área: <span className="font-medium text-gray-700">{item.area}</span>
-                                </span>
-                                {item.categoria && (
-                                    <span className="flex items-center gap-1">
-                                        🏷️ Categoria: <span className="font-medium text-gray-700">{item.categoria}</span>
-                                    </span>
-                                )}
-                            </div>
-                            <div className="mt-3 flex flex-wrap gap-2">
-                                {item.impacto_financeiro === 'Sim' && (
-                                    <span className="px-2 py-1 bg-green-50 text-green-700 rounded text-xs">💰 Impacto Financeiro</span>
-                                )}
-                                {item.impacto_negocios === 'Sim' && (
-                                    <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs">📈 Impacto Negócios</span>
-                                )}
-                                {item.impacto_cliente === 'Sim' && (
-                                    <span className="px-2 py-1 bg-purple-50 text-purple-700 rounded text-xs">👥 Impacto Cliente</span>
-                                )}
-                                {item.okr === 'Sim' && (
-                                    <span className="px-2 py-1 bg-yellow-50 text-yellow-700 rounded text-xs">🎯 OKR</span>
-                                )}
-                                {item.estimado_qp === 'Sim' && (
-                                    <span className="px-2 py-1 bg-indigo-50 text-indigo-700 rounded text-xs">📋 Estimado QP</span>
-                                )}
                             </div>
                         </div>
                     ))}

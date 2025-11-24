@@ -11,6 +11,7 @@ class BacklogItem(BaseModel):
     area: str
     dependencias: Optional[str] = None
     status: str = "Novo"  # Novo, Priorizado, Despriorizado
+    prioridade: int = 999  # 1 a N, onde 1 é mais prioritário
     created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
     
     # Novos campos Sim/Não
@@ -21,6 +22,7 @@ class BacklogItem(BaseModel):
     okr: str = "Não"  # Sim/Não
     estimado_qp: str = "Não"  # Sim/Não (apenas informativo)
     justificativa: Optional[str] = None
+
 
 class ConversationMessage(BaseModel):
     role: str  # user, assistant

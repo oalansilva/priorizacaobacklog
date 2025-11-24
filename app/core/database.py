@@ -74,6 +74,12 @@ class SQLiteRepository(DatabaseRepository):
                 conn.execute("ALTER TABLE items ADD COLUMN justificativa TEXT")
             except sqlite3.OperationalError:
                 pass
+            
+            # Migration: Add prioridade column if not exists
+            try:
+                conn.execute("ALTER TABLE items ADD COLUMN prioridade INTEGER DEFAULT 999")
+            except sqlite3.OperationalError:
+                pass
 
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS conversations (
@@ -112,11 +118,11 @@ class SQLiteRepository(DatabaseRepository):
     def add_item(self, item: BacklogItem) -> BacklogItem:
         with sqlite3.connect(self.db_path) as conn:
             conn.execute(
-                "INSERT INTO items VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO items VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     item.id, item.titulo, item.descricao,
                     item.esforco_estimado, item.area, item.dependencias,
-                    item.status, item.created_at,
+                    item.status, item.prioridade, item.created_at,
                     item.categoria, item.impacto_financeiro, item.impacto_negocios,
                     item.impacto_cliente, item.okr, item.estimado_qp, item.justificativa
                 )
@@ -126,19 +132,20 @@ class SQLiteRepository(DatabaseRepository):
     def list_items(self) -> List[BacklogItem]:
         items = []
         with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.execute("SELECT * FROM items")
+            cursor = conn.execute("SELECT * FROM items ORDER BY prioridade ASC, created_at ASC")
             for row in cursor:
                 items.append(BacklogItem(
                     id=row[0], titulo=row[1], descricao=row[2],
                     esforco_estimado=row[3], area=row[4], dependencias=row[5],
-                    status=row[6], created_at=row[7],
-                    categoria=row[8] if len(row) > 8 else None,
-                    impacto_financeiro=row[9] if len(row) > 9 else "Não",
-                    impacto_negocios=row[10] if len(row) > 10 else "Não",
-                    impacto_cliente=row[11] if len(row) > 11 else "Não",
-                    okr=row[12] if len(row) > 12 else "Não",
-                    estimado_qp=row[13] if len(row) > 13 else "Não",
-                    justificativa=row[14] if len(row) > 14 else None
+                    status=row[6], prioridade=row[7] if len(row) > 7 else 999,
+                    created_at=row[8] if len(row) > 8 else "",
+                    categoria=row[9] if len(row) > 9 else None,
+                    impacto_financeiro=row[10] if len(row) > 10 else "Não",
+                    impacto_negocios=row[11] if len(row) > 11 else "Não",
+                    impacto_cliente=row[12] if len(row) > 12 else "Não",
+                    okr=row[13] if len(row) > 13 else "Não",
+                    estimado_qp=row[14] if len(row) > 14 else "Não",
+                    justificativa=row[15] if len(row) > 15 else None
                 ))
         return items
 
@@ -165,12 +172,12 @@ class SQLiteRepository(DatabaseRepository):
         with sqlite3.connect(self.db_path) as conn:
             conn.execute(
                 """UPDATE items SET titulo=?, descricao=?, esforco_estimado=?, 
-                   area=?, dependencias=?, status=?, categoria=?, impacto_financeiro=?, 
+                   area=?, dependencias=?, status=?, prioridade=?, categoria=?, impacto_financeiro=?, 
                    impacto_negocios=?, impacto_cliente=?, okr=?, estimado_qp=?, justificativa=? WHERE id=?""",
                 (
                     item.titulo, item.descricao,
                     item.esforco_estimado, item.area, item.dependencias,
-                    item.status, item.categoria, item.impacto_financeiro,
+                    item.status, item.prioridade, item.categoria, item.impacto_financeiro,
                     item.impacto_negocios, item.impacto_cliente, item.okr, item.estimado_qp,
                     item.justificativa,
                     item.id
@@ -224,7 +231,98 @@ class SQLiteRepository(DatabaseRepository):
             )
         return settings
 
-# TODO: Implement DynamoDBRepository when ready for production
+
+class DynamoDBRepository(DatabaseRepository):
+    def __init__(self):
+        import boto3
+        from app.config import get_settings
+        
+        self.settings = get_settings()
+        self.dynamodb = boto3.resource('dynamodb', region_name=self.settings.aws_region)
+        self.table_items = self.dynamodb.Table(self.settings.dynamodb_table_items)
+        self.table_conversations = self.dynamodb.Table(self.settings.dynamodb_table_conversations)
+        self.table_settings = self.dynamodb.Table(self.settings.dynamodb_table_settings)
+
+    def add_item(self, item: BacklogItem) -> BacklogItem:
+        # Convert float/int to Decimal is handled by boto3 for standard types, 
+        # but we need to ensure dict format is clean
+        item_dict = item.model_dump()
+        self.table_items.put_item(Item=item_dict)
+        return item
+
+    def list_items(self) -> List[BacklogItem]:
+        # Scan is okay for small backlogs, but for production with millions of items 
+        # Query with GSI would be better. For now, Scan is sufficient.
+        response = self.table_items.scan()
+        items_data = response.get('Items', [])
+        
+        # Handle pagination if needed
+        while 'LastEvaluatedKey' in response:
+            response = self.table_items.scan(ExclusiveStartKey=response['LastEvaluatedKey'])
+            items_data.extend(response.get('Items', []))
+            
+        # Convert decimals to int/float if needed (boto3 returns Decimal)
+        # Pydantic handles type conversion automatically
+        items = [BacklogItem(**item) for item in items_data]
+        
+        # Sort in memory (DynamoDB scan doesn't sort)
+        # Sort by priority (asc) then created_at (asc)
+        items.sort(key=lambda x: (x.prioridade, x.created_at))
+        return items
+
+    def get_conversation(self, conversation_id: str) -> Optional[Conversation]:
+        response = self.table_conversations.get_item(Key={'id': conversation_id})
+        item = response.get('Item')
+        if item:
+            return Conversation(**item)
+        return None
+
+    def save_conversation(self, conversation: Conversation) -> Conversation:
+        self.table_conversations.put_item(Item=conversation.model_dump())
+        return conversation
+
+    def update_item(self, item: BacklogItem) -> BacklogItem:
+        self.table_items.put_item(Item=item.model_dump())
+        return item
+
+    def clear_items(self) -> None:
+        # Scan and delete (inefficient but works for small datasets)
+        # For production, dropping and recreating table is faster
+        scan = self.table_items.scan()
+        with self.table_items.batch_writer() as batch:
+            for each in scan['Items']:
+                batch.delete_item(Key={'id': each['id']})
+
+    def delete_item(self, item_id: str) -> bool:
+        try:
+            self.table_items.delete_item(Key={'id': item_id})
+            return True
+        except Exception:
+            return False
+
+    def get_settings(self) -> SystemSettings:
+        response = self.table_settings.get_item(Key={'id': 1})
+        item = response.get('Item')
+        if item:
+            # DynamoDB stores numbers as Decimal, Pydantic handles conversion
+            return SystemSettings(**item)
+        
+        # If not found, create default
+        default_settings = SystemSettings(id=1)
+        self.update_settings(default_settings)
+        return default_settings
+
+    def update_settings(self, settings: SystemSettings) -> SystemSettings:
+        self.table_settings.put_item(Item=settings.model_dump())
+        return settings
+
+
 def get_repository() -> DatabaseRepository:
-    # Simple factory for now, can be expanded based on env vars
+    from app.config import get_settings
+    settings = get_settings()
+    
+    if settings.database_type.lower() == "dynamodb":
+        return DynamoDBRepository()
+    
     return SQLiteRepository()
+

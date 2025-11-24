@@ -91,6 +91,10 @@ async def setup_rate_limiter() -> None:
             "rate_limiter.disabled",
             reason="Dependências ausentes ou REDIS_URL não configurado.",
         )
+    
+    # Log Database Type
+    logger.info("startup.database_check", database_type=settings.database_type)
+    print(f"\n🚀 USING DATABASE: {settings.database_type.upper()}\n")
 
 
 async def rate_limit_dependency(
@@ -187,11 +191,25 @@ async def priorizar_backlog(
             capacidade_total = capacidade_total or settings.capacidade_total
             percentual_sustentacao = percentual_sustentacao or settings.percentual_sustentacao
         
-        return service.process_dataframe(
+        result = service.process_dataframe(
             df,
             capacidade_total=capacidade_total,
             percentual_sustentacao=percentual_sustentacao,
         )
+
+        # Atualizar itens no banco de dados com o resultado da priorização
+        for prioritized_item in result.itens:
+            # Encontrar o item original pelo título (assumindo títulos únicos por enquanto)
+            # Idealmente, passaríamos o ID por todo o fluxo, mas o LLM recria a lista
+            original_item = next((i for i in items if i.titulo == prioritized_item.item), None)
+            
+            if original_item:
+                original_item.status = prioritized_item.status
+                original_item.prioridade = prioritized_item.prioridade
+                original_item.justificativa = prioritized_item.justificativa
+                repo.update_item(original_item)
+        
+        return result
 
     except HTTPException:
         raise

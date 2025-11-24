@@ -42,6 +42,12 @@ class Settings(BaseModel):
     rate_limit_window_seconds: int = Field(
         default=60, alias="RATE_LIMIT_WINDOW_SECONDS"
     )
+    
+    # Database Configuration
+    database_type: str = Field(default="dynamodb", alias="DATABASE_TYPE")  # Changed default to dynamodb
+    dynamodb_table_items: str = Field(default="backlog_items", alias="DYNAMODB_TABLE_ITEMS")
+    dynamodb_table_conversations: str = Field(default="backlog_conversations", alias="DYNAMODB_TABLE_CONVERSATIONS")
+    dynamodb_table_settings: str = Field(default="backlog_settings", alias="DYNAMODB_TABLE_SETTINGS")
 
     @field_validator("llm_provider")
     @classmethod
