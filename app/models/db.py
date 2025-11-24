@@ -30,3 +30,8 @@ class Conversation(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     messages: List[ConversationMessage] = []
     updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+
+class SystemSettings(BaseModel):
+    capacidade_total: int = 1000
+    percentual_sustentacao: int = 20
+    updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())

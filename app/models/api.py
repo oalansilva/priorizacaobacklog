@@ -11,6 +11,9 @@ class DemandItem(BaseModel):
     negocio: Optional[str] = Field(None, description="Impacto no negócio.")
     financeiro: Optional[str] = Field(None, description="Impacto financeiro.")
     okr: Optional[str] = Field(None, description="OKR relacionado.")
+    estimado_qp: Optional[str] = Field(None, description="Estimado QP.")
+    categoria: Optional[str] = Field(None, description="Categoria do item.")
+    area: Optional[str] = Field(None, description="Área responsável.")
     outros_dados: Optional[dict] = Field(
         default=None, description="Campo livre para atributos adicionais."
     )

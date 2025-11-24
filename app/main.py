@@ -38,14 +38,13 @@ from app.core.prioritization import PrioritizationService
 from app.logging import get_logger
 from app.models import PrioritizationRequest, PrioritizationResponse
 from app.security import enforce_api_key
-from app.api import chat, items
+from app.api import chat, items, settings
 
 logger = get_logger(__name__)
 
 
 def get_service(settings: Settings = Depends(get_settings)) -> PrioritizationService:
     """Dependência para obter o serviço principal."""
-
     return PrioritizationService(settings=settings)
 
 
@@ -57,11 +56,12 @@ app = FastAPI(
 
 app.include_router(chat.router)
 app.include_router(items.router)
+app.include_router(settings.router)
 
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify exact origins
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -203,5 +203,3 @@ async def handle_value_error(_: Request, exc: ValueError) -> JSONResponse:
     """Padroniza retorno para erros de validação."""
 
     return JSONResponse(status_code=400, content={"detail": str(exc)})
-
-

@@ -94,7 +94,7 @@ def list_backlog_items() -> str:
     return result
 
 @tool
-def prioritize_backlog(capacidade_total: int = 100, percentual_sustentacao: int = 20) -> str:
+def prioritize_backlog(capacidade_total: Optional[int] = None, percentual_sustentacao: Optional[int] = None) -> str:
     """EXECUTE A PRIORIZAÇÃO COMPLETA DO BACKLOG usando IA para analisar e ordenar itens.
     
     Use esta ferramenta quando o usuário pedir para:
@@ -110,14 +110,19 @@ def prioritize_backlog(capacidade_total: int = 100, percentual_sustentacao: int 
     4. Retornar um resumo detalhado
     
     Args:
-        capacidade_total: Total de horas disponíveis para o trimestre (padrão: 100)
-        percentual_sustentacao: Percentual da capacidade reservado para sustentação (padrão: 20)
+        capacidade_total: Total de horas disponíveis (opcional, usa configuração do sistema se omitido)
+        percentual_sustentacao: Percentual de sustentação (opcional, usa configuração do sistema se omitido)
     
     Returns:
         Resumo da priorização executada com itens priorizados e despriorizados
     """
     if _repository is None:
         return "Erro: Repositório não inicializado."
+    
+    # Carregar configurações se não forem fornecidas
+    settings_db = _repository.get_settings()
+    cap_total = capacidade_total if capacidade_total is not None else settings_db.capacidade_total
+    perc_sust = percentual_sustentacao if percentual_sustentacao is not None else settings_db.percentual_sustentacao
     
     items = _repository.list_items()
     if not items:
@@ -130,10 +135,12 @@ def prioritize_backlog(capacidade_total: int = 100, percentual_sustentacao: int 
             items_data.append({
                 'item': item.titulo,
                 'horas': item.esforco_estimado,
-                'negocio': None,
-                'cliente': None,
-                'financeiro': None,
-                'okr': None,
+                'negocio': item.impacto_negocios,
+                'cliente': item.impacto_cliente,
+                'financeiro': item.impacto_financeiro,
+                'okr': item.okr,
+                'estimado_qp': item.estimado_qp,
+                'categoria': item.categoria,
                 'area': item.area,
                 'descricao': item.descricao
             })
@@ -146,8 +153,8 @@ def prioritize_backlog(capacidade_total: int = 100, percentual_sustentacao: int 
         
         result = prioritization_service.process_dataframe(
             df,
-            capacidade_total=capacidade_total,
-            percentual_sustentacao=percentual_sustentacao
+            capacidade_total=cap_total,
+            percentual_sustentacao=perc_sust
         )
         
         # Atualizar status dos itens no banco de dados
@@ -165,8 +172,8 @@ def prioritize_backlog(capacidade_total: int = 100, percentual_sustentacao: int 
         response = f"""✅ Priorização concluída com sucesso!
 
 📊 **Resumo:**
-- Capacidade total: {capacidade_total}h
-- Sustentação ({percentual_sustentacao}%): {capacidade_total * percentual_sustentacao / 100}h
+- Capacidade total: {cap_total}h
+- Sustentação ({perc_sust}%): {cap_total * perc_sust / 100}h
 - Capacidade para iniciativas: {result.capacidade_iniciativas}h
 - Horas alocadas: {result.horas_alocadas}h
 

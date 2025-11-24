@@ -3,7 +3,7 @@ import sqlite3
 import json
 import os
 from typing import List, Optional
-from app.models.db import BacklogItem, Conversation, ConversationMessage
+from app.models.db import BacklogItem, Conversation, ConversationMessage, SystemSettings
 
 class DatabaseRepository(abc.ABC):
     @abc.abstractmethod
@@ -28,6 +28,14 @@ class DatabaseRepository(abc.ABC):
 
     @abc.abstractmethod
     def clear_items(self) -> None:
+        pass
+
+    @abc.abstractmethod
+    def get_settings(self) -> SystemSettings:
+        pass
+
+    @abc.abstractmethod
+    def update_settings(self, settings: SystemSettings) -> SystemSettings:
         pass
 
 class SQLiteRepository(DatabaseRepository):
@@ -61,6 +69,19 @@ class SQLiteRepository(DatabaseRepository):
                     messages TEXT,
                     updated_at TEXT
                 )
+            """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS settings (
+                    id INTEGER PRIMARY KEY CHECK (id = 1),
+                    capacidade_total INTEGER,
+                    percentual_sustentacao INTEGER,
+                    updated_at TEXT
+                )
+            """)
+            # Insert default settings if not exists
+            conn.execute("""
+                INSERT OR IGNORE INTO settings (id, capacidade_total, percentual_sustentacao, updated_at)
+                VALUES (1, 1000, 20, datetime('now'))
             """)
 
     def add_item(self, item: BacklogItem) -> BacklogItem:
@@ -133,6 +154,26 @@ class SQLiteRepository(DatabaseRepository):
     def clear_items(self) -> None:
         with sqlite3.connect(self.db_path) as conn:
             conn.execute("DELETE FROM items")
+
+    def get_settings(self) -> SystemSettings:
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute("SELECT capacidade_total, percentual_sustentacao, updated_at FROM settings WHERE id = 1")
+            row = cursor.fetchone()
+            if row:
+                return SystemSettings(
+                    capacidade_total=row[0],
+                    percentual_sustentacao=row[1],
+                    updated_at=row[2]
+                )
+            return SystemSettings()
+
+    def update_settings(self, settings: SystemSettings) -> SystemSettings:
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute(
+                "UPDATE settings SET capacidade_total=?, percentual_sustentacao=?, updated_at=? WHERE id=1",
+                (settings.capacidade_total, settings.percentual_sustentacao, settings.updated_at)
+            )
+        return settings
 
 # TODO: Implement DynamoDBRepository when ready for production
 def get_repository() -> DatabaseRepository:

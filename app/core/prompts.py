@@ -17,8 +17,15 @@ def build_system_prompt(capacidade_total: float) -> str:
    - "item": nome do item
    - "horas": esforço estimado em horas
    - "justificativa": explicação da priorização
+   - "cliente": valor original do campo (Sim/Não)
+   - "negocio": valor original do campo (Sim/Não)
+   - "financeiro": valor original do campo (Sim/Não)
+   - "okr": valor original do campo (Sim/Não)
+   - "estimado_qp": valor original do campo (Sim/Não)
+   - "categoria": valor original do campo
+   - "area": valor original do campo
 
-IMPORTANTE: A sua resposta deve conter APENAS o JSON array com esses 3 campos. Não inclua outros campos. Use chaves em minúsculas.
+IMPORTANTE: A sua resposta deve conter APENAS o JSON array com esses campos. Não inclua outros campos além destes. Use chaves em minúsculas. Mantenha os valores originais dos campos de impacto e metadados.
 
 Use os seguintes princípios para a sua análise:
 - Amplitude de Valor: Itens que impactam Cliente, Negócio e Financeiro são mais valiosos.

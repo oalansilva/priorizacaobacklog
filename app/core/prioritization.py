@@ -103,6 +103,9 @@ class PrioritizationService:
                 negocio=row.get("negocio"),
                 financeiro=row.get("financeiro"),
                 okr=row.get("okr"),
+                estimado_qp=row.get("estimado_qp"),
+                categoria=row.get("categoria"),
+                area=row.get("area"),
                 outros_dados=None,
             )
             for _, row in priorizado.iterrows()
@@ -125,6 +128,7 @@ class PrioritizationService:
         df.dropna(axis=0, how="all", inplace=True)
         
         df.columns = df.columns.str.strip().str.lower()
+        df = df.loc[:, ~df.columns.duplicated()]
         
         # Normalizar colunas
         mapeamento = {
@@ -142,12 +146,20 @@ class PrioritizationService:
             "descricao": "item",
             # Impactos
             "impacto em negócios": "negocio",
+            "impacto_negocios": "negocio",
             "impacto negocio": "negocio",
             "valor de negocio": "negocio",
             "impacto cliente": "cliente",
-            "impacto financeiro": "financeiro"
+            "impacto_cliente": "cliente",
+            "impacto financeiro": "financeiro",
+            "impacto_financeiro": "financeiro",
+            "okr": "okr",
+            "estimado_qp": "estimado_qp",
+            "categoria": "categoria",
+            "area": "area"
         }
         df.rename(columns=mapeamento, inplace=True)
+        df = df.loc[:, ~df.columns.duplicated()]
         
         # Garantir que temos a coluna item e remover linhas sem item
         if "item" in df.columns:
@@ -178,6 +190,8 @@ class PrioritizationService:
 
         resultado = pd.DataFrame(dados)
         resultado.columns = resultado.columns.str.strip().str.lower()
+        # Remover colunas duplicadas (caso o LLM retorne 'Negocio' e 'negocio')
+        resultado = resultado.loc[:, ~resultado.columns.duplicated()]
         return resultado
 
     def _parse_llm_response(self, content: str) -> Any:
@@ -236,10 +250,26 @@ class PrioritizationService:
         df["horas"] = pd.to_numeric(df["horas"], errors="coerce").fillna(0)
         df.insert(0, "prioridade", range(1, len(df) + 1))
 
-        horas_cumulativas = df["horas"].cumsum()
-        df["status"] = horas_cumulativas.le(capacidade_iniciativas).map(
-            {True: "Priorizado", False: "Despriorizado"}
-        )
+        # Primeiro, marcar itens que individualmente excedem a capacidade
+        df["excede_capacidade"] = df["horas"] > capacidade_iniciativas
+        
+        # Para itens que NÃO excedem individualmente, aplicar lógica cumulativa
+        df_cabe = df[~df["excede_capacidade"]].copy()
+        df_nao_cabe = df[df["excede_capacidade"]].copy()
+        
+        if not df_cabe.empty:
+            horas_cumulativas = df_cabe["horas"].cumsum()
+            df_cabe["status"] = horas_cumulativas.le(capacidade_iniciativas).map(
+                {True: "Priorizado", False: "Despriorizado"}
+            )
+        
+        # Itens que excedem individualmente são sempre despriorizados
+        if not df_nao_cabe.empty:
+            df_nao_cabe["status"] = "Despriorizado"
+        
+        # Recombinar
+        df = pd.concat([df_cabe, df_nao_cabe], ignore_index=False).sort_index()
+        df.drop(columns=["excede_capacidade"], inplace=True)
 
         mask = df["status"] == "Despriorizado"
         if mask.any():
