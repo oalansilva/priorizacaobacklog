@@ -60,9 +60,17 @@ class SQLiteRepository(DatabaseRepository):
                     impacto_negocios TEXT DEFAULT 'Não',
                     impacto_cliente TEXT DEFAULT 'Não',
                     okr TEXT DEFAULT 'Não',
-                    estimado_qp TEXT DEFAULT 'Não'
+                    estimado_qp TEXT DEFAULT 'Não',
+                    justificativa TEXT
                 )
             """)
+            
+            # Migration: Add justificativa column if not exists (for existing DBs)
+            try:
+                conn.execute("ALTER TABLE items ADD COLUMN justificativa TEXT")
+            except sqlite3.OperationalError:
+                pass
+
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS conversations (
                     id TEXT PRIMARY KEY,
@@ -87,13 +95,13 @@ class SQLiteRepository(DatabaseRepository):
     def add_item(self, item: BacklogItem) -> BacklogItem:
         with sqlite3.connect(self.db_path) as conn:
             conn.execute(
-                "INSERT INTO items VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO items VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     item.id, item.titulo, item.descricao,
                     item.esforco_estimado, item.area, item.dependencias,
                     item.status, item.created_at,
                     item.categoria, item.impacto_financeiro, item.impacto_negocios,
-                    item.impacto_cliente, item.okr, item.estimado_qp
+                    item.impacto_cliente, item.okr, item.estimado_qp, item.justificativa
                 )
             )
         return item
@@ -112,7 +120,8 @@ class SQLiteRepository(DatabaseRepository):
                     impacto_negocios=row[10] if len(row) > 10 else "Não",
                     impacto_cliente=row[11] if len(row) > 11 else "Não",
                     okr=row[12] if len(row) > 12 else "Não",
-                    estimado_qp=row[13] if len(row) > 13 else "Não"
+                    estimado_qp=row[13] if len(row) > 13 else "Não",
+                    justificativa=row[14] if len(row) > 14 else None
                 ))
         return items
 
@@ -140,12 +149,13 @@ class SQLiteRepository(DatabaseRepository):
             conn.execute(
                 """UPDATE items SET titulo=?, descricao=?, esforco_estimado=?, 
                    area=?, dependencias=?, status=?, categoria=?, impacto_financeiro=?, 
-                   impacto_negocios=?, impacto_cliente=?, okr=?, estimado_qp=? WHERE id=?""",
+                   impacto_negocios=?, impacto_cliente=?, okr=?, estimado_qp=?, justificativa=? WHERE id=?""",
                 (
                     item.titulo, item.descricao,
                     item.esforco_estimado, item.area, item.dependencias,
                     item.status, item.categoria, item.impacto_financeiro,
                     item.impacto_negocios, item.impacto_cliente, item.okr, item.estimado_qp,
+                    item.justificativa,
                     item.id
                 )
             )

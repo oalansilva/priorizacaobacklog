@@ -20,6 +20,7 @@ class BacklogItem(BaseModel):
     impacto_cliente: str = "Não"  # Sim/Não
     okr: str = "Não"  # Sim/Não
     estimado_qp: str = "Não"  # Sim/Não
+    justificativa: Optional[str] = None
 
 class ConversationMessage(BaseModel):
     role: str  # user, assistant

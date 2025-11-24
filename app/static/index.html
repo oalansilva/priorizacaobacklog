@@ -418,6 +418,11 @@
                                                 </div>
                                             </div>
                                             <p className="text-gray-600 mt-1">{item.descricao}</p>
+                                            {item.justificativa && (
+                                                <div className="mt-2 p-2 bg-gray-50 border border-gray-200 rounded text-sm text-gray-700 italic">
+                                                    <span className="font-semibold not-italic">Justificativa:</span> {item.justificativa}
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                     <div className="mt-4 flex gap-4 text-sm text-gray-500">

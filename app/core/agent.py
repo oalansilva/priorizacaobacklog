@@ -163,6 +163,7 @@ def prioritize_backlog(capacidade_total: Optional[int] = None, percentual_susten
             original_item = next((i for i in items if i.titulo == prioritized_item.item), None)
             if original_item:
                 original_item.status = prioritized_item.status
+                original_item.justificativa = prioritized_item.justificativa
                 _repository.update_item(original_item)
         
         # Montar resposta formatada
@@ -188,7 +189,7 @@ def prioritize_backlog(capacidade_total: Optional[int] = None, percentual_susten
         if despriorizados:
             response += f"\n\n❌ **Itens Despriorizados ({len(despriorizados)}):**"
             for item in despriorizados[:3]:
-                response += f"\n- {item.item} ({item.horas}h)"
+                response += f"\n- {item.item} ({item.horas}h)\n  *Justificativa: {item.justificativa}*"
             if len(despriorizados) > 3:
                 response += f"\n... e mais {len(despriorizados) - 3} itens"
         
