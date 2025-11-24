@@ -42,13 +42,17 @@ class SQLiteRepository(DatabaseRepository):
                     id TEXT PRIMARY KEY,
                     titulo TEXT,
                     descricao TEXT,
-                    valor_negocio TEXT,
                     esforco_estimado INTEGER,
                     area TEXT,
                     dependencias TEXT,
-                    prazo TEXT,
                     status TEXT,
-                    created_at TEXT
+                    created_at TEXT,
+                    categoria TEXT,
+                    impacto_financeiro TEXT DEFAULT 'Não',
+                    impacto_negocios TEXT DEFAULT 'Não',
+                    impacto_cliente TEXT DEFAULT 'Não',
+                    okr TEXT DEFAULT 'Não',
+                    estimado_qp TEXT DEFAULT 'Não'
                 )
             """)
             conn.execute("""
@@ -62,11 +66,13 @@ class SQLiteRepository(DatabaseRepository):
     def add_item(self, item: BacklogItem) -> BacklogItem:
         with sqlite3.connect(self.db_path) as conn:
             conn.execute(
-                "INSERT INTO items VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO items VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
-                    item.id, item.titulo, item.descricao, item.valor_negocio,
+                    item.id, item.titulo, item.descricao,
                     item.esforco_estimado, item.area, item.dependencias,
-                    item.prazo, item.status, item.created_at
+                    item.status, item.created_at,
+                    item.categoria, item.impacto_financeiro, item.impacto_negocios,
+                    item.impacto_cliente, item.okr, item.estimado_qp
                 )
             )
         return item
@@ -77,9 +83,15 @@ class SQLiteRepository(DatabaseRepository):
             cursor = conn.execute("SELECT * FROM items")
             for row in cursor:
                 items.append(BacklogItem(
-                    id=row[0], titulo=row[1], descricao=row[2], valor_negocio=row[3],
-                    esforco_estimado=row[4], area=row[5], dependencias=row[6],
-                    prazo=row[7], status=row[8], created_at=row[9]
+                    id=row[0], titulo=row[1], descricao=row[2],
+                    esforco_estimado=row[3], area=row[4], dependencias=row[5],
+                    status=row[6], created_at=row[7],
+                    categoria=row[8] if len(row) > 8 else None,
+                    impacto_financeiro=row[9] if len(row) > 9 else "Não",
+                    impacto_negocios=row[10] if len(row) > 10 else "Não",
+                    impacto_cliente=row[11] if len(row) > 11 else "Não",
+                    okr=row[12] if len(row) > 12 else "Não",
+                    estimado_qp=row[13] if len(row) > 13 else "Não"
                 ))
         return items
 
@@ -105,11 +117,15 @@ class SQLiteRepository(DatabaseRepository):
     def update_item(self, item: BacklogItem) -> BacklogItem:
         with sqlite3.connect(self.db_path) as conn:
             conn.execute(
-                "UPDATE items SET titulo=?, descricao=?, valor_negocio=?, esforco_estimado=?, area=?, dependencias=?, prazo=?, status=? WHERE id=?",
+                """UPDATE items SET titulo=?, descricao=?, esforco_estimado=?, 
+                   area=?, dependencias=?, status=?, categoria=?, impacto_financeiro=?, 
+                   impacto_negocios=?, impacto_cliente=?, okr=?, estimado_qp=? WHERE id=?""",
                 (
-                    item.titulo, item.descricao, item.valor_negocio,
+                    item.titulo, item.descricao,
                     item.esforco_estimado, item.area, item.dependencias,
-                    item.prazo, item.status, item.id
+                    item.status, item.categoria, item.impacto_financeiro,
+                    item.impacto_negocios, item.impacto_cliente, item.okr, item.estimado_qp,
+                    item.id
                 )
             )
         return item

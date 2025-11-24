@@ -35,10 +35,21 @@ def get_agent_executor(repository: DatabaseRepository):
     return _agent_graph
 
 @tool
-def add_backlog_item(titulo: str, descricao: str, valor_negocio: str, esforco_estimado: int, area: str, prazo: str = None) -> str:
+def add_backlog_item(
+    titulo: str, 
+    descricao: str, 
+    esforco_estimado: int, 
+    area: str, 
+    categoria: str = None,
+    impacto_financeiro: str = "Não",
+    impacto_negocios: str = "Não",
+    impacto_cliente: str = "Não",
+    okr: str = "Não",
+    estimado_qp: str = "Não"
+) -> str:
     """Adiciona um novo item ao backlog. 
-    valor_negocio deve ser 'Alto', 'Médio' ou 'Baixo'.
     esforco_estimado deve ser um inteiro (horas).
+    Os campos impacto_financeiro, impacto_negocios, impacto_cliente, okr e estimado_qp devem ser 'Sim' ou 'Não'.
     """
     if _repository is None:
         return "Erro: Repositório não inicializado."
@@ -46,10 +57,14 @@ def add_backlog_item(titulo: str, descricao: str, valor_negocio: str, esforco_es
     item = BacklogItem(
         titulo=titulo,
         descricao=descricao,
-        valor_negocio=valor_negocio,
         esforco_estimado=esforco_estimado,
         area=area,
-        prazo=prazo
+        categoria=categoria,
+        impacto_financeiro=impacto_financeiro,
+        impacto_negocios=impacto_negocios,
+        impacto_cliente=impacto_cliente,
+        okr=okr,
+        estimado_qp=estimado_qp
     )
     _repository.add_item(item)
     return f"Item '{titulo}' adicionado com sucesso ao backlog (ID: {item.id})."
@@ -75,7 +90,7 @@ def list_backlog_items() -> str:
     
     result = "Itens no Backlog:\n"
     for item in items:
-        result += f"- [{item.status}] {item.titulo} (Valor: {item.valor_negocio}, Esforço: {item.esforco_estimado}h)\n"
+        result += f"- [{item.status}] {item.titulo} (Esforço: {item.esforco_estimado}h)\n"
     return result
 
 @tool
@@ -115,7 +130,7 @@ def prioritize_backlog(capacidade_total: int = 100, percentual_sustentacao: int 
             items_data.append({
                 'item': item.titulo,
                 'horas': item.esforco_estimado,
-                'negocio': item.valor_negocio,
+                'negocio': None,
                 'cliente': None,
                 'financeiro': None,
                 'okr': None,

@@ -35,6 +35,8 @@
 
         function App() {
             const [activeTab, setActiveTab] = useState('chat'); // 'chat' or 'backlog'
+            const [messages, setMessages] = useState([]);
+            const [conversationId, setConversationId] = useState(null);
 
             return (
                 <div className="flex flex-col h-full max-w-5xl mx-auto w-full bg-white shadow-xl overflow-hidden">
@@ -59,18 +61,25 @@
                     </header>
 
                     <main className="flex-1 overflow-hidden relative">
-                        {activeTab === 'chat' ? <ChatInterface /> : <BacklogBoard />}
+                        {activeTab === 'chat' ? (
+                            <ChatInterface
+                                messages={messages}
+                                setMessages={setMessages}
+                                conversationId={conversationId}
+                                setConversationId={setConversationId}
+                            />
+                        ) : (
+                            <BacklogBoard />
+                        )}
                     </main>
                 </div>
             );
         }
 
-        function ChatInterface() {
-            const [messages, setMessages] = useState([]);
+        function ChatInterface({ messages, setMessages, conversationId, setConversationId }) {
             const [input, setInput] = useState('');
             const [loading, setLoading] = useState(false);
             const scrollRef = useRef(null);
-            const [conversationId, setConversationId] = useState(null);
 
             useEffect(() => {
                 if (scrollRef.current) {
@@ -154,9 +163,87 @@
             );
         }
 
+        function EditItemModal({ item, onClose, onSave }) {
+            const [formData, setFormData] = useState({ ...item });
+
+            const handleChange = (e) => {
+                const { name, value } = e.target;
+                setFormData(prev => ({ ...prev, [name]: value }));
+            };
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                onSave(formData);
+            };
+
+            return (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+                    <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+                        <div className="p-6 border-b flex justify-between items-center">
+                            <h3 className="text-xl font-bold text-gray-800">Editar Item</h3>
+                            <button onClick={onClose} className="text-gray-500 hover:text-gray-700">✕</button>
+                        </div>
+                        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="col-span-2">
+                                    <label className="block text-sm font-medium text-gray-700">Título</label>
+                                    <input type="text" name="titulo" value={formData.titulo} onChange={handleChange} className="mt-1 w-full border rounded p-2" required />
+                                </div>
+                                <div className="col-span-2">
+                                    <label className="block text-sm font-medium text-gray-700">Descrição</label>
+                                    <textarea name="descricao" value={formData.descricao} onChange={handleChange} className="mt-1 w-full border rounded p-2" rows="3" required />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700">Esforço (horas)</label>
+                                    <input type="number" name="esforco_estimado" value={formData.esforco_estimado} onChange={handleChange} className="mt-1 w-full border rounded p-2" required />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700">Área</label>
+                                    <input type="text" name="area" value={formData.area} onChange={handleChange} className="mt-1 w-full border rounded p-2" required />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700">Categoria</label>
+                                    <input type="text" name="categoria" value={formData.categoria || ''} onChange={handleChange} className="mt-1 w-full border rounded p-2" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700">Status</label>
+                                    <select name="status" value={formData.status} onChange={handleChange} className="mt-1 w-full border rounded p-2">
+                                        <option value="Novo">Novo</option>
+                                        <option value="Priorizado">Priorizado</option>
+                                        <option value="Despriorizado">Despriorizado</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="border-t pt-4">
+                                <h4 className="font-medium text-gray-900 mb-3">Impactos e Classificações (Sim/Não)</h4>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                                    {['impacto_financeiro', 'impacto_negocios', 'impacto_cliente', 'okr', 'estimado_qp'].map(field => (
+                                        <div key={field}>
+                                            <label className="block text-xs font-medium text-gray-500 uppercase mb-1">{field.replace('_', ' ')}</label>
+                                            <select name={field} value={formData[field]} onChange={handleChange} className="w-full border rounded p-2 text-sm">
+                                                <option value="Sim">Sim</option>
+                                                <option value="Não">Não</option>
+                                            </select>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="flex justify-end gap-3 pt-4 border-t mt-6">
+                                <button type="button" onClick={onClose} className="px-4 py-2 text-gray-700 bg-gray-100 rounded hover:bg-gray-200">Cancelar</button>
+                                <button type="submit" className="px-4 py-2 text-white bg-indigo-600 rounded hover:bg-indigo-700">Salvar Alterações</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            );
+        }
+
         function BacklogBoard() {
             const [items, setItems] = useState([]);
             const [loading, setLoading] = useState(true);
+            const [editingItem, setEditingItem] = useState(null);
 
             const fetchItems = async () => {
                 try {
@@ -169,6 +256,17 @@
                 }
             };
 
+            const handleUpdateItem = async (updatedItem) => {
+                try {
+                    await axios.put(`/items/${updatedItem.id}`, updatedItem);
+                    setEditingItem(null);
+                    fetchItems(); // Refresh list
+                } catch (error) {
+                    console.error("Erro ao atualizar item:", error);
+                    alert("Erro ao salvar alterações. Verifique o console.");
+                }
+            };
+
             useEffect(() => {
                 fetchItems();
             }, []);
@@ -176,7 +274,15 @@
             if (loading) return <div className="p-10 text-center">Carregando backlog...</div>;
 
             return (
-                <div className="h-full overflow-y-auto p-6 bg-gray-50">
+                <div className="h-full overflow-y-auto p-6 bg-gray-50 relative">
+                    {editingItem && (
+                        <EditItemModal
+                            item={editingItem}
+                            onClose={() => setEditingItem(null)}
+                            onSave={handleUpdateItem}
+                        />
+                    )}
+
                     <div className="flex justify-between items-center mb-6">
                         <h2 className="text-2xl font-bold text-gray-800">Backlog de Demandas</h2>
                         <button onClick={fetchItems} className="text-indigo-600 hover:text-indigo-800 text-sm">Atualizar</button>
@@ -189,29 +295,59 @@
                     ) : (
                         <div className="grid gap-4">
                             {items.map(item => (
-                                <div key={item.id} className="bg-white p-4 rounded-lg shadow border-l-4 border-indigo-500 hover:shadow-md transition-shadow">
+                                <div key={item.id} className="bg-white p-4 rounded-lg shadow border-l-4 border-indigo-500 hover:shadow-md transition-shadow group">
                                     <div className="flex justify-between items-start">
-                                        <div>
-                                            <h3 className="font-bold text-lg text-gray-900">{item.titulo}</h3>
+                                        <div className="flex-1">
+                                            <div className="flex justify-between items-start">
+                                                <h3 className="font-bold text-lg text-gray-900">{item.titulo}</h3>
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`px-2 py-1 rounded text-xs font-bold ${item.status === 'Priorizado' ? 'bg-green-100 text-green-800' :
+                                                        item.status === 'Despriorizado' ? 'bg-red-100 text-red-800' :
+                                                            'bg-blue-100 text-blue-800'
+                                                        }`}>
+                                                        {item.status}
+                                                    </span>
+                                                    <button
+                                                        onClick={() => setEditingItem(item)}
+                                                        className="text-gray-400 hover:text-indigo-600 p-1 rounded hover:bg-indigo-50 transition-colors"
+                                                        title="Editar Item"
+                                                    >
+                                                        ✎
+                                                    </button>
+                                                </div>
+                                            </div>
                                             <p className="text-gray-600 mt-1">{item.descricao}</p>
                                         </div>
-                                        <span className={`px-2 py-1 rounded text-xs font-bold ${item.status === 'Priorizado' ? 'bg-green-100 text-green-800' :
-                                                item.status === 'Despriorizado' ? 'bg-red-100 text-red-800' :
-                                                    'bg-blue-100 text-blue-800'
-                                            }`}>
-                                            {item.status}
-                                        </span>
                                     </div>
                                     <div className="mt-4 flex gap-4 text-sm text-gray-500">
-                                        <span className="flex items-center gap-1">
-                                            📊 Valor: <span className="font-medium text-gray-700">{item.valor_negocio}</span>
-                                        </span>
                                         <span className="flex items-center gap-1">
                                             ⏱️ Esforço: <span className="font-medium text-gray-700">{item.esforco_estimado}h</span>
                                         </span>
                                         <span className="flex items-center gap-1">
                                             📁 Área: <span className="font-medium text-gray-700">{item.area}</span>
                                         </span>
+                                        {item.categoria && (
+                                            <span className="flex items-center gap-1">
+                                                🏷️ Categoria: <span className="font-medium text-gray-700">{item.categoria}</span>
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="mt-3 flex flex-wrap gap-2">
+                                        {item.impacto_financeiro === 'Sim' && (
+                                            <span className="px-2 py-1 bg-green-50 text-green-700 rounded text-xs">💰 Impacto Financeiro</span>
+                                        )}
+                                        {item.impacto_negocios === 'Sim' && (
+                                            <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs">📈 Impacto Negócios</span>
+                                        )}
+                                        {item.impacto_cliente === 'Sim' && (
+                                            <span className="px-2 py-1 bg-purple-50 text-purple-700 rounded text-xs">👥 Impacto Cliente</span>
+                                        )}
+                                        {item.okr === 'Sim' && (
+                                            <span className="px-2 py-1 bg-yellow-50 text-yellow-700 rounded text-xs">🎯 OKR</span>
+                                        )}
+                                        {item.estimado_qp === 'Sim' && (
+                                            <span className="px-2 py-1 bg-indigo-50 text-indigo-700 rounded text-xs">📋 Estimado QP</span>
+                                        )}
                                     </div>
                                 </div>
                             ))}
