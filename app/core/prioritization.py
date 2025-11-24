@@ -177,7 +177,18 @@ class PrioritizationService:
         self, df: pd.DataFrame, capacidade_iniciativas: float
     ) -> pd.DataFrame:
         lista = df.to_dict(orient="records")
-        system_message = SystemMessage(build_system_prompt(capacidade_iniciativas))
+        from app.core.database import get_repository
+        
+        # Obter configurações atualizadas do banco de dados
+        repo = get_repository()
+        db_settings = repo.get_settings()
+        weights = db_settings.model_dump()
+        
+        # Fallback para self.settings se valores forem None (embora o DB deva ter defaults)
+        if not weights.get('peso_financeiro'):
+             weights.update(self.settings.model_dump())
+
+        system_message = SystemMessage(build_system_prompt(capacidade_iniciativas, weights))
         human_message = HumanMessage(build_human_prompt(lista, capacidade_iniciativas))
 
         resposta = self.llm.invoke([system_message, human_message])

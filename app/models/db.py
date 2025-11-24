@@ -19,7 +19,7 @@ class BacklogItem(BaseModel):
     impacto_negocios: str = "Não"  # Sim/Não
     impacto_cliente: str = "Não"  # Sim/Não
     okr: str = "Não"  # Sim/Não
-    estimado_qp: str = "Não"  # Sim/Não
+    estimado_qp: str = "Não"  # Sim/Não (apenas informativo)
     justificativa: Optional[str] = None
 
 class ConversationMessage(BaseModel):
@@ -27,12 +27,18 @@ class ConversationMessage(BaseModel):
     content: str
     timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())
 
+
 class Conversation(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     messages: List[ConversationMessage] = []
     updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())
 
 class SystemSettings(BaseModel):
+    id: int = 1
     capacidade_total: int = 1000
     percentual_sustentacao: int = 20
-    updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+    peso_financeiro: int = 25
+    peso_negocios: int = 25
+    peso_cliente: int = 25
+    peso_okr: int = 25
+    updated_at: Optional[str] = Field(default_factory=lambda: datetime.now().isoformat())

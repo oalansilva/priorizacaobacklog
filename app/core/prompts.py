@@ -6,8 +6,18 @@ import json
 from typing import List, Mapping, Any
 
 
-def build_system_prompt(capacidade_total: float) -> str:
+def build_system_prompt(capacidade_total: float, weights: Mapping[str, int] = None) -> str:
     """Retorna o prompt de sistema com instruções estratégicas."""
+
+    weights_text = ""
+    if weights:
+        weights_text = "\n\nConsidere os seguintes pesos para a priorização (0-100%):\n"
+        weights_text += f"- Impacto Financeiro: {weights.get('peso_financeiro', 25)}%\n"
+        weights_text += f"- Impacto Negócios: {weights.get('peso_negocios', 25)}%\n"
+        weights_text += f"- Impacto Cliente: {weights.get('peso_cliente', 25)}%\n"
+        weights_text += f"- OKR: {weights.get('peso_okr', 25)}%\n"
+        weights_text += "Itens com critérios de maior peso devem ter preferência na lista.\n"
+        weights_text += "IMPORTANTE: O campo 'estimado_qp' é apenas informativo (indica se o item foi estimado no Quarter Planning) e NÃO deve influenciar a priorização."
 
     return f"""Você é um experiente Product Manager (PM). A sua tarefa é receber uma lista de itens de backlog e propor uma ordem de prioridade para um trimestre com uma capacidade total de {capacidade_total} horas para estas iniciativas.
 
@@ -30,7 +40,7 @@ IMPORTANTE: A sua resposta deve conter APENAS o JSON array com esses campos. Nã
 Use os seguintes princípios para a sua análise:
 - Amplitude de Valor: Itens que impactam Cliente, Negócio e Financeiro são mais valiosos.
 - Alinhamento com OKR: A contribuição para um OKR tem um peso muito alto.
-- Custo-Benefício: Pondere o esforço em 'horas' versus o impacto gerado. Itens de alto custo que impediriam a entrega de vários outros itens de alto valor devem ser cuidadosamente avaliados."""
+- Custo-Benefício: Pondere o esforço em 'horas' versus o impacto gerado. Itens de alto custo que impediriam a entrega de vários outros itens de alto valor devem ser cuidadosamente avaliados.{weights_text}"""
 
 
 def build_human_prompt(itens: List[Mapping[str, Any]], capacidade_total: float) -> str:

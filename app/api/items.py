@@ -21,3 +21,11 @@ def update_item(item_id: str, item: BacklogItem, repo: DatabaseRepository = Depe
     if not updated_item:
         raise HTTPException(status_code=404, detail="Item not found")
     return updated_item
+
+@router.delete("/{item_id}")
+def delete_item(item_id: str, repo: DatabaseRepository = Depends(get_repository)):
+    """Delete an item from the backlog by ID."""
+    deleted = repo.delete_item(item_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Item not found")
+    return {"message": "Item deleted successfully", "id": item_id}

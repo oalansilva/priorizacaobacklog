@@ -2,19 +2,15 @@
 
 from __future__ import annotations
 
-import io
 from typing import Optional
 
 import pandas as pd
 from fastapi import (
     Depends,
     FastAPI,
-    File,
-    Form,
     HTTPException,
     Request,
     Response,
-    UploadFile,
 )
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse, FileResponse
@@ -137,65 +133,71 @@ async def priorizar_backlog(
     request: Request,
     response: Response,
     service: PrioritizationService = Depends(get_service),
-    file: Optional[UploadFile] = File(
-        default=None, description="CSV contendo as demandas."
-    ),
-    capacidade_total: Optional[int] = Form(
-        default=None, description="Sobrescreve a capacidade total via formulário."
-    ),
-    percentual_sustentacao: Optional[int] = Form(
-        default=None,
-        description="Sobrescreve o percentual de sustentação via formulário.",
-    ),
+    capacidade_total: Optional[int] = None,
+    percentual_sustentacao: Optional[int] = None,
 ) -> PrioritizationResponse:
     """
-    Prioriza itens enviados via JSON ou upload CSV.
+    Prioriza itens do backlog armazenados no banco de dados.
 
-    - Content-Type `application/json`: enviar `PrioritizationRequest`.
-    - Content-Type `multipart/form-data`: enviar arquivo CSV em `file`.
+    Parâmetros opcionais:
+    - `capacidade_total`: Sobrescreve a capacidade total do sistema.
+    - `percentual_sustentacao`: Sobrescreve o percentual de sustentação.
+    
+    Se não fornecidos, usa os valores configurados no sistema.
     """
 
     # Aplicar rate limiting
     await rate_limit_dependency(request, response, None)
 
-    content_type = request.headers.get("content-type", "")
-
     try:
-        if content_type.startswith("application/json"):
-            payload = await request.json()
-            dados = PrioritizationRequest.model_validate(payload)
-            df = pd.DataFrame([item.model_dump() for item in dados.itens])
-            return service.process_dataframe(
-                df,
-                capacidade_total=dados.capacidade_total,
-                percentual_sustentacao=dados.percentual_sustentacao,
+        # Importar repositório
+        from app.core.database import get_repository
+        
+        repo = get_repository()
+        
+        # Obter itens do banco de dados
+        items = repo.list_items()
+        
+        if not items:
+            raise HTTPException(
+                status_code=400,
+                detail="Nenhum item encontrado no banco de dados. Adicione itens usando POST /items primeiro.",
             )
-
-        if "multipart/form-data" in content_type:
-            if not file:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Envie o ficheiro CSV no campo 'file'.",
-                )
-
-            conteudo = await file.read()
-            buffer = io.BytesIO(conteudo)
-            df = pd.read_csv(buffer, sep=";")
-            return service.process_dataframe(
-                df,
-                capacidade_total=capacidade_total,
-                percentual_sustentacao=percentual_sustentacao,
-            )
+        
+        # Converter BacklogItem para formato de DataFrame
+        items_dict = []
+        for item in items:
+            items_dict.append({
+                "item": item.titulo,
+                "horas": item.esforco_estimado,
+                "financeiro": item.impacto_financeiro,
+                "negocio": item.impacto_negocios,
+                "cliente": item.impacto_cliente,
+                "okr": item.okr,
+                "categoria": item.categoria,
+                "area": item.area,
+                "estimado_qp": item.estimado_qp,
+            })
+        
+        df = pd.DataFrame(items_dict)
+        
+        # Obter configurações do sistema se não fornecidas
+        if capacidade_total is None or percentual_sustentacao is None:
+            settings = repo.get_settings()
+            capacidade_total = capacidade_total or settings.capacidade_total
+            percentual_sustentacao = percentual_sustentacao or settings.percentual_sustentacao
+        
+        return service.process_dataframe(
+            df,
+            capacidade_total=capacidade_total,
+            percentual_sustentacao=percentual_sustentacao,
+        )
 
     except HTTPException:
         raise
     except Exception as exc:
+        logger.error("prioritization_error", error=str(exc))
         raise HTTPException(status_code=500, detail=str(exc)) from exc
-
-    raise HTTPException(
-        status_code=415,
-        detail="Content-Type não suportado. Use application/json ou multipart/form-data.",
-    )
 
 
 @app.exception_handler(ValueError)

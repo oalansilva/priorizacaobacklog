@@ -1,0 +1,122 @@
+[
+  {
+    "titulo": "Implementar sistema de cache distribuído",
+    "descricao": "Adicionar Redis para cache de consultas frequentes e melhorar performance",
+    "esforco_estimado": 80,
+    "area": "Backend",
+    "categoria": "Iniciativa",
+    "impacto_financeiro": "Sim",
+    "impacto_negocios": "Sim",
+    "impacto_cliente": "Sim",
+    "okr": "Sim",
+    "estimado_qp": "Sim"
+  },
+  {
+    "titulo": "Corrigir vazamento de memória no módulo de relatórios",
+    "descricao": "Bug crítico causando crash em produção após 6 horas de uso",
+    "esforco_estimado": 40,
+    "area": "Backend",
+    "categoria": "Bug",
+    "impacto_financeiro": "Sim",
+    "impacto_negocios": "Sim",
+    "impacto_cliente": "Sim",
+    "okr": "Não",
+    "estimado_qp": "Sim"
+  },
+  {
+    "titulo": "Adicionar dark mode na interface",
+    "descricao": "Implementar tema escuro para melhorar experiência do usuário",
+    "esforco_estimado": 60,
+    "area": "Frontend",
+    "categoria": "Melhoria",
+    "impacto_financeiro": "Não",
+    "impacto_negocios": "Não",
+    "impacto_cliente": "Sim",
+    "okr": "Não",
+    "estimado_qp": "Sim"
+  },
+  {
+    "titulo": "Pesquisa de viabilidade - Migração para Kubernetes",
+    "descricao": "Avaliar custos e benefícios de migrar infraestrutura para K8s",
+    "esforco_estimado": 120,
+    "area": "DevOps",
+    "categoria": "Discovery",
+    "impacto_financeiro": "Sim",
+    "impacto_negocios": "Sim",
+    "impacto_cliente": "Não",
+    "okr": "Sim",
+    "estimado_qp": "Não"
+  },
+  {
+    "titulo": "Integração com API de pagamento Stripe",
+    "descricao": "Adicionar Stripe como nova opção de gateway de pagamento",
+    "esforco_estimado": 160,
+    "area": "Backend",
+    "categoria": "Iniciativa",
+    "impacto_financeiro": "Sim",
+    "impacto_negocios": "Sim",
+    "impacto_cliente": "Sim",
+    "okr": "Sim",
+    "estimado_qp": "Sim"
+  },
+  {
+    "titulo": "Resolver problema de timeout em exportação de dados",
+    "descricao": "Exportações grandes falham após 30 segundos",
+    "esforco_estimado": 32,
+    "area": "Backend",
+    "categoria": "Bug",
+    "impacto_financeiro": "Não",
+    "impacto_negocios": "Sim",
+    "impacto_cliente": "Sim",
+    "okr": "Não",
+    "estimado_qp": "Sim"
+  },
+  {
+    "titulo": "Otimizar queries do dashboard principal",
+    "descricao": "Reduzir tempo de carregamento de 8s para menos de 2s",
+    "esforco_estimado": 48,
+    "area": "Backend",
+    "categoria": "Melhoria",
+    "impacto_financeiro": "Não",
+    "impacto_negocios": "Sim",
+    "impacto_cliente": "Sim",
+    "okr": "Sim",
+    "estimado_qp": "Sim"
+  },
+  {
+    "titulo": "Implementar autenticação via SSO",
+    "descricao": "Adicionar suporte para login com Google, Microsoft e SAML",
+    "esforco_estimado": 200,
+    "area": "Backend",
+    "categoria": "Iniciativa",
+    "impacto_financeiro": "Sim",
+    "impacto_negocios": "Sim",
+    "impacto_cliente": "Sim",
+    "okr": "Sim",
+    "estimado_qp": "Não"
+  },
+  {
+    "titulo": "Estudo de IA para recomendação de produtos",
+    "descricao": "Pesquisar e prototipar sistema de recomendação com ML",
+    "esforco_estimado": 96,
+    "area": "Data Science",
+    "categoria": "Discovery",
+    "impacto_financeiro": "Sim",
+    "impacto_negocios": "Sim",
+    "impacto_cliente": "Sim",
+    "okr": "Sim",
+    "estimado_qp": "Não"
+  },
+  {
+    "titulo": "Adicionar testes E2E com Playwright",
+    "descricao": "Implementar suite de testes end-to-end para fluxos críticos",
+    "esforco_estimado": 72,
+    "area": "QA",
+    "categoria": "Melhoria",
+    "impacto_financeiro": "Não",
+    "impacto_negocios": "Sim",
+    "impacto_cliente": "Não",
+    "okr": "Sim",
+    "estimado_qp": "Sim"
+  }
+]

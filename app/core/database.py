@@ -31,6 +31,10 @@ class DatabaseRepository(abc.ABC):
         pass
 
     @abc.abstractmethod
+    def delete_item(self, item_id: str) -> bool:
+        pass
+
+    @abc.abstractmethod
     def get_settings(self) -> SystemSettings:
         pass
 
@@ -83,13 +87,26 @@ class SQLiteRepository(DatabaseRepository):
                     id INTEGER PRIMARY KEY CHECK (id = 1),
                     capacidade_total INTEGER,
                     percentual_sustentacao INTEGER,
+                    peso_financeiro INTEGER DEFAULT 25,
+                    peso_negocios INTEGER DEFAULT 25,
+                    peso_cliente INTEGER DEFAULT 25,
+                    peso_okr INTEGER DEFAULT 25,
                     updated_at TEXT
                 )
             """)
+            
+            # Migration: Add weight columns if not exists
+            for col in ['peso_financeiro', 'peso_negocios', 'peso_cliente', 'peso_okr']:
+                try:
+                    conn.execute(f"ALTER TABLE settings ADD COLUMN {col} INTEGER DEFAULT 25")
+                except sqlite3.OperationalError:
+                    pass
+
             # Insert default settings if not exists
             conn.execute("""
-                INSERT OR IGNORE INTO settings (id, capacidade_total, percentual_sustentacao, updated_at)
-                VALUES (1, 1000, 20, datetime('now'))
+                INSERT OR IGNORE INTO settings (id, capacidade_total, percentual_sustentacao, 
+                   peso_financeiro, peso_negocios, peso_cliente, peso_okr, updated_at) 
+                   VALUES (1, 1000, 20, 25, 25, 25, 25, datetime('now'))
             """)
 
     def add_item(self, item: BacklogItem) -> BacklogItem:
@@ -165,23 +182,45 @@ class SQLiteRepository(DatabaseRepository):
         with sqlite3.connect(self.db_path) as conn:
             conn.execute("DELETE FROM items")
 
+    def delete_item(self, item_id: str) -> bool:
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute("DELETE FROM items WHERE id = ?", (item_id,))
+            return cursor.rowcount > 0
+
     def get_settings(self) -> SystemSettings:
         with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.execute("SELECT capacidade_total, percentual_sustentacao, updated_at FROM settings WHERE id = 1")
+            cursor = conn.execute("""
+                SELECT capacidade_total, percentual_sustentacao, 
+                       peso_financeiro, peso_negocios, peso_cliente, peso_okr,
+                       updated_at 
+                FROM settings WHERE id = 1
+            """)
             row = cursor.fetchone()
             if row:
                 return SystemSettings(
                     capacidade_total=row[0],
                     percentual_sustentacao=row[1],
-                    updated_at=row[2]
+                    peso_financeiro=row[2] if row[2] is not None else 25,
+                    peso_negocios=row[3] if row[3] is not None else 25,
+                    peso_cliente=row[4] if row[4] is not None else 25,
+                    peso_okr=row[5] if row[5] is not None else 25,
+                    updated_at=row[6]
                 )
             return SystemSettings()
 
     def update_settings(self, settings: SystemSettings) -> SystemSettings:
         with sqlite3.connect(self.db_path) as conn:
             conn.execute(
-                "UPDATE settings SET capacidade_total=?, percentual_sustentacao=?, updated_at=? WHERE id=1",
-                (settings.capacidade_total, settings.percentual_sustentacao, settings.updated_at)
+                """UPDATE settings SET 
+                   capacidade_total=?, percentual_sustentacao=?, 
+                   peso_financeiro=?, peso_negocios=?, peso_cliente=?, peso_okr=?,
+                   updated_at=? WHERE id=1""",
+                (
+                    settings.capacidade_total, settings.percentual_sustentacao,
+                    settings.peso_financeiro, settings.peso_negocios, settings.peso_cliente, 
+                    settings.peso_okr,
+                    settings.updated_at
+                )
             )
         return settings
 
