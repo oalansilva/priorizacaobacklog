@@ -55,7 +55,7 @@ function EditItemModal({ item, onClose, onSave }) {
                     <div className="border-t pt-4">
                         <h4 className="font-medium text-gray-900 mb-3">Impactos e Classificações (Sim/Não)</h4>
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                            {['impacto_financeiro', 'impacto_negocios', 'impacto_cliente', 'okr', 'estimado_qp'].map(field => (
+                            {['impacto_financeiro', 'impacto_negocios', 'impacto_cliente', 'okr', 'must_have', 'estimado_qp'].map(field => (
                                 <div key={field}>
                                     <label className="block text-xs font-medium text-gray-500 uppercase mb-1">{field.replace('_', ' ')}</label>
                                     <select name={field} value={formData[field]} onChange={handleChange} className="w-full border rounded p-2 text-sm">

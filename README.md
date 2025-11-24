@@ -1,84 +1,114 @@
-# Prioriza Backlog
+# 🎯 Prioriza Backlog
 
-Agente de priorização de backlog construído em Python + LangChain, agora exposto via FastAPI com integração nativa ao AWS Bedrock.
+Sistema inteligente de priorização de backlog usando IA (AWS Bedrock + Claude).
 
-## Estrutura
+[![Python](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.104-green.svg)](https://fastapi.tiangolo.com/)
+[![AWS](https://img.shields.io/badge/AWS-Bedrock-orange.svg)](https://aws.amazon.com/bedrock/)
 
-- `app/core`: regras de negócio e prompts.
-- `app/services`: integrações (LLM, storage).
-- `app/main.py`: aplicação FastAPI.
-- `agente.py`: CLI interativo para uso local.
-- `main_lambda.py`: handler para AWS Lambda.
-
-## Requisitos
-
-- Python 3.11+
-- AWS credentials com acesso ao Bedrock e S3.
-- Redis (para rate limiting) – use `docker-compose` para subir rapidamente.
-
-Instalação:
+## 🚀 Quick Start
 
 ```bash
+# Clone e configure
+git clone <repo-url>
+cd priorizacaobacklog
+
+# Crie ambiente virtual
 python -m venv .venv
 .venv\Scripts\activate  # Windows
+# source .venv/bin/activate  # Linux/Mac
+
+# Instale dependências
 pip install -r requirements.txt
-```
 
-## Variáveis de ambiente principais
+# Configure AWS
+cp .env.example .env
+# Edite .env com suas credenciais AWS
 
-| Nome | Descrição |
-| --- | --- |
-| `AWS_REGION` | Região usada para Bedrock/S3 (ex.: `us-east-1`). |
-| `BEDROCK_MODEL_ID` | Modelo Bedrock (ex.: `anthropic.claude-3-sonnet-20240229-v1:0`). |
-| `LLM_PROVIDER` | `bedrock` (default) ou `openai`. |
-| `API_KEY_VALUE` | Valor esperado no header `X-API-Key`. Deixe vazio para desativar. |
-| `STORAGE_BUCKET` | Bucket S3 para salvar roadmaps (opcional). |
-| `REDIS_URL` | URL Redis para rate limiting (`redis://redis:6379/0`). |
-
-## Executar CLI
-
-```bash
-python agente.py
-```
-
-## Executar a API
-
-```bash
+# Execute localmente
 uvicorn app.main:app --reload
 ```
 
-Endpoints:
-- `POST /priorizacoes` – aceita JSON (`PrioritizationRequest`) ou upload CSV (campo `file`) e devolve `PrioritizationResponse`.
-- `GET /healthz` – verificação simples.
+Acesse: **http://localhost:8000**
 
-Com docker-compose (inclui Redis + LocalStack):
+## 📋 Funcionalidades
 
-```bash
-docker-compose up --build
+- ✅ Priorização inteligente de backlog usando IA
+- ✅ Análise de impacto (financeiro, negócios, cliente, OKR)
+- ✅ Interface web interativa
+- ✅ API REST completa
+- ✅ Persistência em DynamoDB
+- ✅ Ordenação por prioridade numérica (1 a N)
+- ✅ Chat conversacional para gerenciar itens
+
+## 📚 Documentação
+
+### Configuração Inicial
+- [Configuração AWS](docs/setup/aws-configuration.md) - Setup de credenciais e DynamoDB
+- [Guia de Documentação](DOCUMENTATION_GUIDE.md) - Como organizar docs
+
+### Guias de Uso
+- [Testes Locais](docs/guides/testing-local.md) - Como testar a aplicação localmente
+- [Testes em Produção](docs/guides/testing-production.md) - Validação em ambiente AWS
+- [Dados de Teste](docs/guides/test-data.md) - Como usar massa de dados de teste
+
+### Funcionalidades
+- [Exclusão de Itens](docs/features/delete-item.md) - Como deletar itens do backlog
+- [Pesos de Priorização](docs/features/priority-weights.md) - Como funcionam os pesos configuráveis
+
+## 🛠️ Tecnologias
+
+- **Backend**: FastAPI, Python 3.11
+- **IA**: AWS Bedrock (Claude 3.5 Sonnet)
+- **Banco de Dados**: AWS DynamoDB
+- **Frontend**: React (vanilla JS)
+- **Deploy**: Docker, AWS Lambda
+
+## 📁 Estrutura do Projeto
+
+```
+priorizacaobacklog/
+├── app/                    # Código da aplicação
+│   ├── api/               # Endpoints da API
+│   ├── core/              # Lógica de negócio
+│   ├── models/            # Modelos de dados
+│   └── static/            # Frontend React
+├── docs/                   # Documentação
+│   ├── setup/             # Guias de configuração
+│   ├── guides/            # Guias de uso
+│   └── features/          # Documentação de features
+├── scripts/                # Scripts utilitários
+├── README.md              # Este arquivo
+└── requirements.txt       # Dependências Python
 ```
 
-## Deploy em AWS
+## 🧪 Scripts Úteis
 
-### Lambda + API Gateway
+```bash
+# Importar dados de teste
+python scripts/import_test_data.py
 
-1. Empacote aplicação (Zip com dependências ou use container Lambda).
-2. Utilize `main_lambda.py` (handler `main_lambda.handler`).
-3. Configure variáveis (API key, Redis – caso use ElastiCache –, bucket S3).
+# Inicializar DynamoDB
+python scripts/init_dynamodb.py
 
-### ECS Fargate
+# Executar priorização via API
+python scripts/run_prioritization.py
+```
 
-1. Build da imagem: `docker build -t prioriza-backlog .`.
-2. Publique no ECR e crie serviço Fargate (atrás de Application Load Balancer).
-3. Configure Auto Scaling baseado em CPU/memória e CloudWatch (ex.: requests/min).
+## 🤝 Contribuindo
 
-## Observabilidade & Segurança
+Contribuições são bem-vindas! Por favor:
 
-- Logs estruturados com `structlog` (prontos para CloudWatch).
-- Rate limiting opcional via Redis (`fastapi-limiter`).
-- Autenticação por API Key (`X-API-Key`).
-- Segredos recomendados no AWS Secrets Manager/SSM Parameter Store.
+1. Fork o projeto
+2. Crie uma branch para sua feature (`git checkout -b feature/AmazingFeature`)
+3. Commit suas mudanças (`git commit -m 'Add some AmazingFeature'`)
+4. Push para a branch (`git push origin feature/AmazingFeature`)
+5. Abra um Pull Request
 
-## Roadmap Próximo
+## 📄 Licença
 
-- Persistência de histórico em DynamoDB.
-- Testes automatizados cobrindo fluxo da API.
+Este projeto está sob a licença MIT.
+
+## 📞 Suporte
+
+Para dúvidas ou problemas, abra uma [issue](https://github.com/seu-usuario/priorizacaobacklog/issues).

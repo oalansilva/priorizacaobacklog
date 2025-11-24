@@ -31,6 +31,7 @@ def build_system_prompt(capacidade_total: float, weights: Mapping[str, int] = No
    - "negocio": valor original do campo (Sim/Não)
    - "financeiro": valor original do campo (Sim/Não)
    - "okr": valor original do campo (Sim/Não)
+   - "must_have": valor original do campo (Sim/Não)
    - "estimado_qp": valor original do campo (Sim/Não)
    - "categoria": valor original do campo
    - "area": valor original do campo
@@ -38,6 +39,18 @@ def build_system_prompt(capacidade_total: float, weights: Mapping[str, int] = No
 IMPORTANTE: A sua resposta deve conter APENAS o JSON array com esses campos. Não inclua outros campos além destes. Use chaves em minúsculas. Mantenha os valores originais dos campos de impacto e metadados.
 
 Use os seguintes princípios para a sua análise:
+
+🚨 **REGRA ABSOLUTA - MUST HAVE - PRIORIDADE MÁXIMA**:
+ANTES DE QUALQUER ANÁLISE, identifique TODOS os itens com must_have="Sim". 
+Estes itens são OBRIGATÓRIOS e devem SEMPRE aparecer no topo da lista como "Priorizado", INDEPENDENTEMENTE de:
+- Capacidade disponível
+- Esforço em horas
+- Outros critérios de impacto
+- Qualquer outra consideração
+
+NUNCA despriorize um item com must_have="Sim". Se houver múltiplos itens Must Have, ordene-os entre si por impacto, mas TODOS devem estar priorizados antes de qualquer item não-Must Have.
+
+Após garantir que todos os Must Have estão priorizados, aplique os critérios abaixo para os demais itens:
 - Amplitude de Valor: Itens que impactam Cliente, Negócio e Financeiro são mais valiosos.
 - Alinhamento com OKR: A contribuição para um OKR tem um peso muito alto.
 - Custo-Benefício: Pondere o esforço em 'horas' versus o impacto gerado. Itens de alto custo que impediriam a entrega de vários outros itens de alto valor devem ser cuidadosamente avaliados.{weights_text}"""

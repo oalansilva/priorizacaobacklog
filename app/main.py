@@ -178,6 +178,7 @@ async def priorizar_backlog(
                 "negocio": item.impacto_negocios,
                 "cliente": item.impacto_cliente,
                 "okr": item.okr,
+                "must_have": item.must_have,
                 "categoria": item.categoria,
                 "area": item.area,
                 "estimado_qp": item.estimado_qp,

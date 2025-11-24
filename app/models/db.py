@@ -20,6 +20,7 @@ class BacklogItem(BaseModel):
     impacto_negocios: str = "Não"  # Sim/Não
     impacto_cliente: str = "Não"  # Sim/Não
     okr: str = "Não"  # Sim/Não
+    must_have: str = "Não"  # Sim/Não - Item obrigatório para priorização
     estimado_qp: str = "Não"  # Sim/Não (apenas informativo)
     justificativa: Optional[str] = None
 

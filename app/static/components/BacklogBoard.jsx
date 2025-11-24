@@ -64,6 +64,9 @@ function BacklogBoard() {
 
     if (loading) return <div className="p-10 text-center">Carregando backlog...</div>;
 
+    // Sort items by priority (ascending)
+    const sortedItems = [...items].sort((a, b) => (a.prioridade || 999) - (b.prioridade || 999));
+
     return (
         <div className="h-full overflow-y-auto p-4 bg-gray-50 relative">
             {editingItem && (
@@ -136,19 +139,19 @@ function BacklogBoard() {
                 </div>
             </div>
 
-            {items.length === 0 ? (
+            {sortedItems.length === 0 ? (
                 <div className="text-center text-gray-500 py-8 border-2 border-dashed rounded-lg">
                     O backlog está vazio. Use o chat para adicionar itens.
                 </div>
             ) : (
                 <div className="grid gap-2">
-                    {items.map(item => (
+                    {sortedItems.map(item => (
                         <div key={item.id} className="bg-white p-3 rounded-lg shadow-sm border-l-4 border-indigo-500 hover:shadow-md transition-shadow">
                             <div className="flex justify-between items-start gap-3">
                                 <div className="flex-1 min-w-0">
                                     <div className="flex justify-between items-start gap-2 mb-1">
                                         <h3 className="font-bold text-base text-gray-900 truncate flex-1">
-                                            {item.status === 'Priorizado' && item.prioridade < 999 ? (
+                                            {item.prioridade && item.prioridade < 999 ? (
                                                 <span className="mr-2 inline-flex items-center justify-center w-6 h-6 bg-indigo-100 text-indigo-800 text-xs font-bold rounded-full">
                                                     #{item.prioridade}
                                                 </span>
@@ -215,6 +218,9 @@ function BacklogBoard() {
                                         )}
                                         {item.okr === 'Sim' && (
                                             <span className="px-1.5 py-0.5 bg-yellow-50 text-yellow-700 rounded text-xs font-medium">🎯 OKR</span>
+                                        )}
+                                        {item.must_have === 'Sim' && (
+                                            <span className="px-1.5 py-0.5 bg-red-50 text-red-700 rounded text-xs font-medium border border-red-300">⚠️ Must Have</span>
                                         )}
                                         {item.estimado_qp === 'Sim' && (
                                             <span className="px-1.5 py-0.5 bg-indigo-50 text-indigo-700 rounded text-xs font-medium">📋 QP</span>
