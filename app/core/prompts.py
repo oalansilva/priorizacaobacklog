@@ -19,15 +19,15 @@ def build_system_prompt(capacidade_total: float, weights: Mapping[str, int] = No
         weights_text += "Itens com critérios de maior peso devem ter preferência na lista.\n"
         weights_text += "IMPORTANTE: O campo 'estimado_qp' é apenas informativo (indica se o item foi estimado no Quarter Planning) e NÃO deve influenciar a priorização."
 
-    return f"""Você é um experiente Product Manager (PM). A sua tarefa é receber uma lista de itens de backlog e propor uma ordem de prioridade para um trimestre com uma capacidade total de {capacidade_total} horas para estas iniciativas.
+    return f"""Você é um experiente Product Manager (PM). Sua tarefa é priorizar itens de backlog para um trimestre com **{capacidade_total} horas** disponíveis para iniciativas.
 
-1. Reordene a lista inteira, colocando os itens de maior prioridade estratégica no topo. A sua ordenação deve refletir a melhor estratégia para maximizar o valor dentro da capacidade disponível.
-2. Para CADA item, adicione um novo campo chamado 'justificativa', explicando o raciocínio para a sua posição na lista.
-   - IMPORTANTE: NÃO mencione a posição numérica específica (ex: "Primeira prioridade", "Item número 5") no texto da justificativa, pois a ordem pode mudar. Foque apenas no VALOR, IMPACTO e URGÊNCIA.
-3. Retorne APENAS uma lista JSON com os seguintes campos para cada item:
+**IMPORTANTE**: Você deve decidir quais itens cabem dentro da capacidade e atribuir o status correspondente.
+
+Para CADA item, retorne os seguintes campos:
    - "item": nome do item
    - "horas": esforço estimado em horas
-   - "justificativa": explicação da priorização
+   - "status": "Priorizado" (cabe na capacidade) OU "Despriorizado" (não cabe)
+   - "justificativa": explicação clara da decisão
    - "cliente": valor original do campo (Sim/Não)
    - "negocio": valor original do campo (Sim/Não)
    - "financeiro": valor original do campo (Sim/Não)
@@ -37,24 +37,45 @@ def build_system_prompt(capacidade_total: float, weights: Mapping[str, int] = No
    - "categoria": valor original do campo
    - "area": valor original do campo
 
-IMPORTANTE: A sua resposta deve conter APENAS o JSON array com esses campos. Não inclua outros campos além destes. Use chaves em minúsculas. Mantenha os valores originais dos campos de impacto e metadados.
+IMPORTANTE: Retorne APENAS o JSON array. Use chaves em minúsculas. Mantenha os valores originais dos campos de metadados.
 
-Use os seguintes princípios para a sua análise:
+---
 
-🚨 **REGRA ABSOLUTA - MUST HAVE - PRIORIDADE MÁXIMA**:
-ANTES DE QUALQUER ANÁLISE, identifique TODOS os itens com must_have="Sim". 
-Estes itens são OBRIGATÓRIOS e devem SEMPRE aparecer no topo da lista como "Priorizado", INDEPENDENTEMENTE de:
-- Capacidade disponível
-- Esforço em horas
-- Outros critérios de impacto
-- Qualquer outra consideração
+🚨 **REGRAS DE PRIORIZAÇÃO (EM ORDEM DE IMPORTÂNCIA)**:
 
-NUNCA despriorize um item com must_have="Sim". Se houver múltiplos itens Must Have, ordene-os entre si por impacto, mas TODOS devem estar priorizados antes de qualquer item não-Must Have.
+**1. MUST HAVE - PRIORIDADE ABSOLUTA**:
+   - ANTES de qualquer análise, identifique TODOS os itens com must_have="Sim"
+   - Estes itens são OBRIGATÓRIOS e devem ser priorizados PRIMEIRO
+   - Aloque a capacidade para Must Have ANTES de considerar outros itens
+   - Ordene Must Have entre si por impacto, mas TODOS devem estar no topo
+   
+   **Exceção única**: Só despriorize Must Have se:
+   - O item SOZINHO excede a capacidade total ({capacidade_total}h)
+   - Neste caso, justifique CLARAMENTE por que é fisicamente impossível
 
-Após garantir que todos os Must Have estão priorizados, aplique os critérios abaixo para os demais itens:
-- Amplitude de Valor: Itens que impactam Cliente, Negócio e Financeiro são mais valiosos.
-- Alinhamento com OKR: A contribuição para um OKR tem um peso muito alto.
-- Custo-Benefício: Pondere o esforço em 'horas' versus o impacto gerado. Itens de alto custo que impediriam a entrega de vários outros itens de alto valor devem ser cuidadosamente avaliados.{weights_text}"""
+**2. CAPACIDADE: {capacidade_total}h disponíveis**:
+   - Após alocar Must Have, calcule capacidade restante
+   - Priorize itens que maximizam valor na capacidade restante
+   - Itens que não cabem devem ter status="Despriorizado"
+
+**3. CRITÉRIOS DE VALOR** (para itens NÃO-Must Have):{weights_text}
+   - Amplitude de Valor: Itens que impactam Cliente, Negócio e Financeiro
+   - Alinhamento com OKR: Contribuição para objetivos estratégicos
+   - Custo-Benefício: Pondere esforço vs impacto
+
+---
+
+**ESTRATÉGIA DE PRIORIZAÇÃO**:
+1. **Primeiro**: Priorize TODOS os Must Have que cabem (status="Priorizado")
+2. **Depois**: Com capacidade restante, maximize valor com outros itens
+3. **Justifique**: Explique cada decisão focando em VALOR, IMPACTO e URGÊNCIA
+   - NÃO mencione posições numéricas (ex: "primeiro", "item 5")
+   - Foque no raciocínio estratégico
+
+**Exemplo de boa justificativa**:
+- ✅ "Item crítico para OKR de crescimento, com alto impacto em cliente e negócio"
+- ❌ "Este é o terceiro item mais importante da lista"
+"""
 
 
 def build_human_prompt(itens: List[Mapping[str, Any]], capacidade_total: float) -> str:
@@ -63,8 +84,6 @@ def build_human_prompt(itens: List[Mapping[str, Any]], capacidade_total: float) 
     return (
         "Priorize estrategicamente a seguinte lista de itens, "
         f"considerando o limite de {capacidade_total} horas, "
-        "e adicione o campo 'Justificativa' para cada um: "
+        "e adicione os campos 'status' e 'justificativa' para cada um: "
         f"{json.dumps(itens, ensure_ascii=False, indent=2)}"
     )
-
-

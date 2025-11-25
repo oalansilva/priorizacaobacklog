@@ -21,12 +21,10 @@ def get_agent_executor(repository: DatabaseRepository):
     if _agent_graph is not None:
         return _agent_graph
     
+    from app.services.llm import get_llm
+    
     settings = get_settings()
-    llm = ChatOpenAI(
-        model="gpt-4-turbo-preview", 
-        temperature=0,
-        api_key=settings.openai_api_key
-    )
+    llm = get_llm(settings)
 
     tools = [add_backlog_item, list_backlog_items, prioritize_backlog]
 
@@ -124,49 +122,16 @@ def prioritize_backlog(capacidade_total: Optional[int] = None, percentual_susten
     cap_total = capacidade_total if capacidade_total is not None else settings_db.capacidade_total
     perc_sust = percentual_sustentacao if percentual_sustentacao is not None else settings_db.percentual_sustentacao
     
-    items = _repository.list_items()
-    if not items:
-        return "Não há itens para priorizar."
-
     try:
-        # Converter itens do banco para DataFrame
-        items_data = []
-        for item in items:
-            items_data.append({
-                'item': item.titulo,
-                'horas': item.esforco_estimado,
-                'negocio': item.impacto_negocios,
-                'cliente': item.impacto_cliente,
-                'financeiro': item.impacto_financeiro,
-                'okr': item.okr,
-                'estimado_qp': item.estimado_qp,
-                'categoria': item.categoria,
-                'area': item.area,
-                'descricao': item.descricao
-            })
+        # Usar a função compartilhada de priorização
+        from app.main import execute_prioritization
         
-        df = pd.DataFrame(items_data)
-        
-        # Executar priorização usando o serviço existente
-        settings = get_settings()
-        prioritization_service = PrioritizationService(settings=settings)
-        
-        result = prioritization_service.process_dataframe(
-            df,
+        result = execute_prioritization(
             capacidade_total=cap_total,
             percentual_sustentacao=perc_sust
         )
         
-        # Atualizar status dos itens no banco de dados
-        for prioritized_item in result.itens:
-            # Encontrar o item original pelo título
-            original_item = next((i for i in items if i.titulo == prioritized_item.item), None)
-            if original_item:
-                original_item.status = prioritized_item.status
-                original_item.justificativa = prioritized_item.justificativa
-                _repository.update_item(original_item)
-        
-        # Montar resposta formatada
+        # Montar resposta formatada para o chat
         priorizados = [i for i in result.itens if i.status == "Priorizado"]
         despriorizados = [i for i in result.itens if i.status == "Despriorizado"]
         

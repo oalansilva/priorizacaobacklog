@@ -6,7 +6,7 @@ import json
 from typing import Any, List, Optional, Tuple
 
 import pandas as pd
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from app.config import Settings, get_settings
 from app.core.prompts import build_human_prompt, build_system_prompt
@@ -191,19 +191,51 @@ class PrioritizationService:
         system_message = SystemMessage(build_system_prompt(capacidade_iniciativas, weights))
         human_message = HumanMessage(build_human_prompt(lista, capacidade_iniciativas))
 
-        resposta = self.llm.invoke([system_message, human_message])
-        dados = self._parse_llm_response(resposta.content)
+        messages = [system_message, human_message]
+        
+        MAX_RETRIES = 3
+        last_error = None
+        
+        for attempt in range(MAX_RETRIES):
+            try:
+                resposta = self.llm.invoke(messages)
+                dados = self._parse_llm_response(resposta.content)
 
-        if not isinstance(dados, list):
-            raise ValueError(
-                f"A IA retornou um formato inválido. Esperado list, recebido {type(dados)}"
-            )
+                if not isinstance(dados, list):
+                    raise ValueError(
+                        f"A IA retornou um formato inválido. Esperado list, recebido {type(dados)}"
+                    )
+                
+                # Validar se todos os itens têm o campo 'status'
+                # Convertemos para DataFrame temporariamente para facilitar a validação
+                df_temp = pd.DataFrame(dados)
+                if "status" not in df_temp.columns:
+                     raise KeyError("O campo 'status' ('Priorizado' ou 'Despriorizado') é obrigatório para TODOS os itens, mas não foi encontrado na resposta.")
 
-        resultado = pd.DataFrame(dados)
-        resultado.columns = resultado.columns.str.strip().str.lower()
-        # Remover colunas duplicadas (caso o LLM retorne 'Negocio' e 'negocio')
-        resultado = resultado.loc[:, ~resultado.columns.duplicated()]
-        return resultado
+                resultado = pd.DataFrame(dados)
+                resultado.columns = resultado.columns.str.strip().str.lower()
+                # Remover colunas duplicadas (caso o LLM retorne 'Negocio' e 'negocio')
+                resultado = resultado.loc[:, ~resultado.columns.duplicated()]
+                return resultado
+                
+            except (ValueError, KeyError, json.JSONDecodeError) as e:
+                last_error = e
+                self.logger.warning(
+                    "llm_retry",
+                    attempt=attempt + 1,
+                    error=str(e),
+                    message="Solicitando correção para a LLM"
+                )
+                
+                # Adicionar erro ao histórico da conversa para a LLM corrigir
+                messages.append(AIMessage(content=str(resposta.content)))
+                messages.append(HumanMessage(
+                    content=f"Erro ao processar seu JSON: {str(e)}. "
+                    "Por favor, corrija o formato e certifique-se de incluir o campo 'status' ('Priorizado' ou 'Despriorizado') para TODOS os itens. "
+                    "Retorne APENAS o JSON corrigido."
+                ))
+        
+        raise ValueError(f"Falha na priorização após {MAX_RETRIES} tentativas. A LLM não retornou o formato correto. Último erro: {last_error}")
 
     def _parse_llm_response(self, content: str) -> Any:
         """Parse LLM response, extracting JSON from markdown code blocks if present."""
@@ -251,46 +283,84 @@ class PrioritizationService:
     def _aplicar_status_e_prioridade(
         self, df: pd.DataFrame, capacidade_iniciativas: float
     ) -> pd.DataFrame:
+        """
+        Valida e organiza a resposta da LLM.
+        A LLM já decidiu o status de cada item baseado na capacidade.
+        """
         if "horas" not in df.columns:
             raise KeyError(
                 "Coluna 'horas' não encontrada na resposta da IA. "
                 f"Colunas disponíveis: {df.columns.tolist()}"
             )
-
+        
         df = df.copy()
         df["horas"] = pd.to_numeric(df["horas"], errors="coerce").fillna(0)
-        df.insert(0, "prioridade", range(1, len(df) + 1))
-
-        # Primeiro, marcar itens que individualmente excedem a capacidade
-        df["excede_capacidade"] = df["horas"] > capacidade_iniciativas
         
-        # Para itens que NÃO excedem individualmente, aplicar lógica cumulativa
-        df_cabe = df[~df["excede_capacidade"]].copy()
-        df_nao_cabe = df[df["excede_capacidade"]].copy()
         
-        if not df_cabe.empty:
-            horas_cumulativas = df_cabe["horas"].cumsum()
-            df_cabe["status"] = horas_cumulativas.le(capacidade_iniciativas).map(
-                {True: "Priorizado", False: "Despriorizado"}
+        # Fallback: Se LLM não retornou status, calcular baseado na capacidade
+        if "status" not in df.columns:
+            raise KeyError(
+                "Coluna 'status' não encontrada na resposta da IA. "
+                "A LLM deve retornar o campo 'status' para cada item. "
+                f"Colunas disponíveis: {df.columns.tolist()}"
             )
         
-        # Itens que excedem individualmente são sempre despriorizados
-        if not df_nao_cabe.empty:
-            df_nao_cabe["status"] = "Despriorizado"
+        # Normalizar status (Title Case) e tratar nulos
+        if "status" in df.columns:
+            df["status"] = df["status"].fillna("Despriorizado").astype(str).str.title()
+            # Garantir que apenas valores válidos existam
+            df.loc[~df["status"].isin(["Priorizado", "Despriorizado"]), "status"] = "Despriorizado"
+
+        # Validação: avisar se Must Have foi despriorizado (não forçar mudança)
+        if "must_have" in df.columns:
+            mask_must_have_desp = (df["must_have"].str.lower() == "sim") & (df["status"] == "Despriorizado")
+            if mask_must_have_desp.any():
+                items_desp = df.loc[mask_must_have_desp, "item"].tolist()
+                self.logger.warning(
+                    "must_have_deprioritized",
+                    count=mask_must_have_desp.sum(),
+                    items=items_desp,
+                    message="LLM despriorizou itens Must Have - revisar justificativas"
+                )
         
-        # Recombinar
-        df = pd.concat([df_cabe, df_nao_cabe], ignore_index=False).sort_index()
-        df.drop(columns=["excede_capacidade"], inplace=True)
-
-        mask = df["status"] == "Despriorizado"
-        if mask.any():
-            df.loc[mask, "justificativa"] = (
-                df.loc[mask, "justificativa"].fillna("Item de valor estratégico.")
-                + " No entanto, foi despriorizado por falta de capacidade neste trimestre."
+        # Validação: avisar se total de horas priorizadas excede capacidade
+        mask_priorizado = df["status"] == "Priorizado"
+        total_horas_priorizadas = df.loc[mask_priorizado, "horas"].sum()
+        if total_horas_priorizadas > capacidade_iniciativas:
+            self.logger.warning(
+                "capacity_exceeded",
+                total_horas=total_horas_priorizadas,
+                capacidade=capacidade_iniciativas,
+                excesso=total_horas_priorizadas - capacidade_iniciativas,
+                message=f"Total de horas priorizadas ({total_horas_priorizadas}h) excede capacidade ({capacidade_iniciativas}h)"
             )
-
-        df = df.sort_values(by=["status", "prioridade"], ascending=[False, True])
+        
+        # Ordenar: Priorizado primeiro, depois Must Have primeiro, depois ordem original
+        df["_status_order"] = df["status"].map({"Priorizado": 0, "Despriorizado": 1})
+        if "must_have" in df.columns:
+            df["_must_have_order"] = df["must_have"].str.lower().map({"sim": 0, "não": 1}).fillna(1)
+        else:
+            df["_must_have_order"] = 1
+        
+        df = df.sort_values(
+            by=["_status_order", "_must_have_order"], 
+            ascending=[True, True]
+        )
+        df.drop(columns=["_status_order", "_must_have_order"], inplace=True)
         df.reset_index(drop=True, inplace=True)
+        
+        # Atribuir prioridades numéricas
+        df.loc[mask_priorizado, "prioridade"] = range(1, mask_priorizado.sum() + 1)
+        df.loc[~mask_priorizado, "prioridade"] = 999
+        
+        self.logger.info(
+            "priority_assignment",
+            num_priorizados=mask_priorizado.sum(),
+            num_despriorizados=(~mask_priorizado).sum(),
+            prioridades_priorizados=df.loc[mask_priorizado, "prioridade"].tolist() if mask_priorizado.sum() > 0 else [],
+            prioridades_despriorizados=df.loc[~mask_priorizado, "prioridade"].tolist() if (~mask_priorizado).sum() > 0 else []
+        )
+        
         return df
 
 

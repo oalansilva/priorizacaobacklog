@@ -1,9 +1,4 @@
-"""Aplicação FastAPI para priorização de backlog."""
-
-from __future__ import annotations
-
 from typing import Optional
-
 import pandas as pd
 from fastapi import (
     Depends,
@@ -127,6 +122,119 @@ async def healthcheck() -> dict[str, str]:
     return {"status": "ok"}
 
 
+def execute_prioritization(
+    capacidade_total: Optional[int] = None,
+    percentual_sustentacao: Optional[int] = None,
+) -> PrioritizationResponse:
+    """
+    Função compartilhada para executar priorização e atualizar banco de dados.
+    
+    Pode ser chamada tanto pelo endpoint /priorizacoes quanto pelo agente.
+    
+    Args:
+        capacidade_total: Capacidade total em horas (usa configuração do sistema se None)
+        percentual_sustentacao: Percentual de sustentação (usa configuração do sistema se None)
+    
+    Returns:
+        PrioritizationResponse com resultado da priorização
+    
+    Raises:
+        HTTPException: Se não houver itens no banco de dados
+    """
+    from app.core.database import get_repository
+    
+    repo = get_repository()
+    
+    # Fix: Instantiate service directly to avoid Depends() issue when called from Agent
+    from app.config import get_settings
+    settings = get_settings()
+    service = PrioritizationService(settings=settings)
+    
+    # Obter itens do banco de dados
+    items = repo.list_items()
+    
+    if not items:
+        raise HTTPException(
+            status_code=400,
+            detail="Nenhum item encontrado no banco de dados. Adicione itens usando POST /items primeiro.",
+        )
+    
+    # Converter BacklogItem para formato de DataFrame
+    items_dict = []
+    for item in items:
+        items_dict.append({
+            "item": item.titulo,
+            "horas": item.esforco_estimado,
+            "financeiro": item.impacto_financeiro,
+            "negocio": item.impacto_negocios,
+            "cliente": item.impacto_cliente,
+            "okr": item.okr,
+            "must_have": item.must_have,
+            "categoria": item.categoria,
+            "area": item.area,
+            "estimado_qp": item.estimado_qp,
+        })
+    
+    df = pd.DataFrame(items_dict)
+    
+    # Obter configurações do sistema se não fornecidas
+    if capacidade_total is None or percentual_sustentacao is None:
+        settings = repo.get_settings()
+        capacidade_total = capacidade_total or settings.capacidade_total
+        percentual_sustentacao = percentual_sustentacao or settings.percentual_sustentacao
+    
+    result = service.process_dataframe(
+        df,
+        capacidade_total=capacidade_total,
+        percentual_sustentacao=percentual_sustentacao,
+    )
+
+    # Atualizar itens no banco de dados com o resultado da priorização
+    logger.info(
+        "starting_database_update",
+        total_result_items=len(result.itens),
+        total_db_items=len(items)
+    )
+    
+    updated_count = 0
+    not_found_count = 0
+    for prioritized_item in result.itens:
+        # Encontrar o item original pelo título (assumindo títulos únicos por enquanto)
+        # Idealmente, passaríamos o ID por todo o fluxo, mas o LLM recria a lista
+        original_item = next((i for i in items if i.titulo == prioritized_item.item), None)
+        
+        if original_item:
+            logger.info(
+                "updating_item",
+                item_id=original_item.id,
+                titulo=original_item.titulo[:30],
+                old_prioridade=original_item.prioridade,
+                new_prioridade=prioritized_item.prioridade,
+                old_status=original_item.status,
+                new_status=prioritized_item.status
+            )
+            original_item.status = prioritized_item.status
+            original_item.prioridade = prioritized_item.prioridade
+            original_item.justificativa = prioritized_item.justificativa
+            repo.update_item(original_item)
+            updated_count += 1
+        else:
+            not_found_count += 1
+            logger.warning(
+                "item_not_found_in_db",
+                titulo=prioritized_item.item[:50]
+            )
+    
+    logger.info(
+        "database_update_complete",
+        updated_count=updated_count,
+        not_found_count=not_found_count,
+        total_items=len(result.itens)
+    )
+    
+    return result
+
+
 @app.post(
     "/priorizacoes",
     response_model=PrioritizationResponse,
@@ -136,7 +244,6 @@ async def healthcheck() -> dict[str, str]:
 async def priorizar_backlog(
     request: Request,
     response: Response,
-    service: PrioritizationService = Depends(get_service),
     capacidade_total: Optional[int] = None,
     percentual_sustentacao: Optional[int] = None,
 ) -> PrioritizationResponse:
@@ -154,63 +261,7 @@ async def priorizar_backlog(
     await rate_limit_dependency(request, response, None)
 
     try:
-        # Importar repositório
-        from app.core.database import get_repository
-        
-        repo = get_repository()
-        
-        # Obter itens do banco de dados
-        items = repo.list_items()
-        
-        if not items:
-            raise HTTPException(
-                status_code=400,
-                detail="Nenhum item encontrado no banco de dados. Adicione itens usando POST /items primeiro.",
-            )
-        
-        # Converter BacklogItem para formato de DataFrame
-        items_dict = []
-        for item in items:
-            items_dict.append({
-                "item": item.titulo,
-                "horas": item.esforco_estimado,
-                "financeiro": item.impacto_financeiro,
-                "negocio": item.impacto_negocios,
-                "cliente": item.impacto_cliente,
-                "okr": item.okr,
-                "must_have": item.must_have,
-                "categoria": item.categoria,
-                "area": item.area,
-                "estimado_qp": item.estimado_qp,
-            })
-        
-        df = pd.DataFrame(items_dict)
-        
-        # Obter configurações do sistema se não fornecidas
-        if capacidade_total is None or percentual_sustentacao is None:
-            settings = repo.get_settings()
-            capacidade_total = capacidade_total or settings.capacidade_total
-            percentual_sustentacao = percentual_sustentacao or settings.percentual_sustentacao
-        
-        result = service.process_dataframe(
-            df,
-            capacidade_total=capacidade_total,
-            percentual_sustentacao=percentual_sustentacao,
-        )
-
-        # Atualizar itens no banco de dados com o resultado da priorização
-        for prioritized_item in result.itens:
-            # Encontrar o item original pelo título (assumindo títulos únicos por enquanto)
-            # Idealmente, passaríamos o ID por todo o fluxo, mas o LLM recria a lista
-            original_item = next((i for i in items if i.titulo == prioritized_item.item), None)
-            
-            if original_item:
-                original_item.status = prioritized_item.status
-                original_item.prioridade = prioritized_item.prioridade
-                original_item.justificativa = prioritized_item.justificativa
-                repo.update_item(original_item)
-        
-        return result
+        return execute_prioritization(capacidade_total, percentual_sustentacao)
 
     except HTTPException:
         raise
