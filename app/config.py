@@ -17,9 +17,15 @@ class Settings(BaseModel):
 
     aws_region: str = Field(default="us-east-1", alias="AWS_REGION")
     aws_profile: Optional[str] = Field(default=None, alias="AWS_PROFILE")
-    bedrock_model_id: str = Field(
-        default="anthropic.claude-3-sonnet-20240229-v1:0",
+    bedrock_model_id: Optional[str] = Field(
+        default=None,
         alias="BEDROCK_MODEL_ID",
+    )
+    bedrock_guardrail_id: Optional[str] = Field(
+        default=None, alias="BEDROCK_GUARDRAIL_ID"
+    )
+    bedrock_guardrail_version: str = Field(
+        default="DRAFT", alias="BEDROCK_GUARDRAIL_VERSION"
     )
     llm_provider: str = Field(default="bedrock", alias="LLM_PROVIDER")
     openai_model: str = Field(default="gpt-4o", alias="OPENAI_MODEL")
@@ -30,8 +36,8 @@ class Settings(BaseModel):
     )
     storage_bucket: Optional[str] = Field(default=None, alias="STORAGE_BUCKET")
     storage_prefix: str = Field(default="roadmaps/", alias="STORAGE_PREFIX")
-    resultado_sheet_name: str = Field(
-        default="Roadmap Q3 2025", alias="RESULTADO_SHEET_NAME"
+    resultado_sheet_name: Optional[str] = Field(
+        default=None, alias="RESULTADO_SHEET_NAME"
     )
     api_key_name: str = Field(default="X-API-Key", alias="API_KEY_NAME")
     api_key_value: Optional[str] = Field(default=None, alias="API_KEY_VALUE")

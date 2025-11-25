@@ -31,13 +31,24 @@ def get_llm(settings: Optional[Settings] = None) -> BaseChatModel:
                 "langchain-aws não está instalado. Execute `pip install langchain-aws`."
             )
 
-        return ChatBedrock(
-            model_id=cfg.bedrock_model_id,
-            region_name=cfg.aws_region,
-            credentials_profile_name=cfg.aws_profile,
-            temperature=cfg.temperature,
-            model_kwargs={"max_tokens": 8192},
-        )
+        model_kwargs = {"max_tokens": 8192}
+        
+        # Adicionar guardrails se configurado
+        kwargs = {
+            "model_id": cfg.bedrock_model_id,
+            "region_name": cfg.aws_region,
+            "credentials_profile_name": cfg.aws_profile,
+            "temperature": cfg.temperature,
+            "model_kwargs": model_kwargs,
+        }
+        
+        if cfg.bedrock_guardrail_id:
+            kwargs["guardrails"] = {
+                "guardrailIdentifier": cfg.bedrock_guardrail_id,
+                "guardrailVersion": cfg.bedrock_guardrail_version,
+            }
+
+        return ChatBedrock(**kwargs)
 
     if provider == "openai":
         if not cfg.openai_api_key:
