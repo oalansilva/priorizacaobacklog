@@ -23,6 +23,7 @@ def build_system_prompt(capacidade_total: float, weights: Mapping[str, int] = No
 
 1. Reordene a lista inteira, colocando os itens de maior prioridade estratégica no topo. A sua ordenação deve refletir a melhor estratégia para maximizar o valor dentro da capacidade disponível.
 2. Para CADA item, adicione um novo campo chamado 'justificativa', explicando o raciocínio para a sua posição na lista.
+   - IMPORTANTE: NÃO mencione a posição numérica específica (ex: "Primeira prioridade", "Item número 5") no texto da justificativa, pois a ordem pode mudar. Foque apenas no VALOR, IMPACTO e URGÊNCIA.
 3. Retorne APENAS uma lista JSON com os seguintes campos para cada item:
    - "item": nome do item
    - "horas": esforço estimado em horas
