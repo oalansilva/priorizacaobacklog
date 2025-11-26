@@ -45,3 +45,9 @@ class SystemSettings(BaseModel):
     peso_cliente: int = 25
     peso_okr: int = 25
     updated_at: Optional[str] = Field(default_factory=lambda: datetime.now().isoformat())
+    
+    # Status de priorização assíncrona
+    last_prioritization_status: Optional[str] = None  # "running", "completed", "error"
+    last_prioritization_message: Optional[str] = None
+    last_prioritization_time: Optional[str] = None
+

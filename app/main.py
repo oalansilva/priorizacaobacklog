@@ -1,5 +1,7 @@
 from typing import Optional
+import os
 import pandas as pd
+from pathlib import Path
 from fastapi import (
     Depends,
     FastAPI,
@@ -39,10 +41,13 @@ def get_service(settings: Settings = Depends(get_settings)) -> PrioritizationSer
     return PrioritizationService(settings=settings)
 
 
+settings_instance = get_settings()
+
 app = FastAPI(
     title="Prioriza Backlog API",
     version="0.1.0",
     description="API para priorização de demandas com AWS Bedrock + LangChain.",
+    root_path=settings_instance.root_path,
 )
 
 app.include_router(chat.router)
@@ -58,11 +63,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.mount("/static", StaticFiles(directory="app/static"), name="static")
+@app.middleware("http")
+async def add_csp_header(request: Request, call_next):
+    response = await call_next(request)
+    # Permissive CSP for Babel standalone and external CDNs
+    response.headers["Content-Security-Policy"] = "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; script-src * 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval';"
+    return response
+
+# Get the directory where this file is located
+BASE_DIR = Path(__file__).resolve().parent
+STATIC_DIR = BASE_DIR / "static"
+
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 @app.get("/", include_in_schema=False)
 async def read_root():
-    return FileResponse("app/static/index.html")
+    return FileResponse(str(STATIC_DIR / "index.html"))
 
 
 @app.on_event("startup")

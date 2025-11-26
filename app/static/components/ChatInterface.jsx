@@ -19,19 +19,63 @@ function ChatInterface({ messages, setMessages, conversationId, setConversationI
         setInput('');
         setLoading(true);
 
+        // Add empty assistant message to start streaming into
+        setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
+
         try {
-            const response = await axios.post('/chat/', {
-                message: userMsg.content,
-                conversation_id: conversationId
+            const response = await fetch('chat/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    message: userMsg.content,
+                    conversation_id: conversationId
+                })
             });
 
-            const botMsg = { role: 'assistant', content: response.data.response };
-            setMessages(prev => [...prev, botMsg]);
-            setConversationId(response.data.conversation_id);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const newConvId = response.headers.get('X-Conversation-ID');
+            if (newConvId) {
+                setConversationId(newConvId);
+            }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) {
+                    console.log("Stream complete");
+                    break;
+                }
+
+                const chunk = decoder.decode(value, { stream: true });
+                console.log("Received chunk:", chunk.length, "chars");
+
+                setMessages(prev => {
+                    const newMessages = [...prev];
+                    const lastMsg = newMessages[newMessages.length - 1];
+                    if (lastMsg.role === 'assistant') {
+                        lastMsg.content += chunk;
+                    }
+                    return newMessages;
+                });
+            }
+
         } catch (error) {
             console.error("Erro no chat:", error);
-            const errorMsg = error.response?.data?.detail || "Desculpe, ocorreu um erro ao processar sua mensagem.";
-            setMessages(prev => [...prev, { role: 'assistant', content: errorMsg }]);
+            setMessages(prev => {
+                const newMessages = [...prev];
+                const lastMsg = newMessages[newMessages.length - 1];
+                if (lastMsg.role === 'assistant') {
+                    lastMsg.content += "\n\n[Erro: Não foi possível processar a resposta.]";
+                }
+                return newMessages;
+            });
         } finally {
             setLoading(false);
         }

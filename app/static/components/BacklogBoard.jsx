@@ -5,10 +5,11 @@ function BacklogBoard() {
     const [loading, setLoading] = useState(true);
     const [editingItem, setEditingItem] = useState(null);
     const [viewingJustification, setViewingJustification] = useState(null);
+    const [prioritizationStatus, setPrioritizationStatus] = useState(null);
 
     const fetchItems = async () => {
         try {
-            const response = await axios.get('/items/');
+            const response = await axios.get('items/');
             setItems(response.data);
         } catch (error) {
             console.error("Erro ao buscar itens:", error);
@@ -17,9 +18,20 @@ function BacklogBoard() {
         }
     };
 
+    const fetchStatus = async () => {
+        try {
+            const response = await axios.get('items/prioritization-status');
+            console.log("Status fetched:", response.data);
+            console.log("Will display?", response.data.status !== 'none');
+            setPrioritizationStatus(response.data);
+        } catch (error) {
+            console.error("Erro ao buscar status:", error);
+        }
+    };
+
     const handleUpdateItem = async (updatedItem) => {
         try {
-            await axios.put(`/items/${updatedItem.id}`, updatedItem);
+            await axios.put(`items/${updatedItem.id}`, updatedItem);
             setEditingItem(null);
             fetchItems();
         } catch (error) {
@@ -34,7 +46,7 @@ function BacklogBoard() {
         }
 
         try {
-            await axios.delete(`/items/${itemId}`);
+            await axios.delete(`items/${itemId}`);
             fetchItems();
         } catch (error) {
             console.error("Erro ao deletar item:", error);
@@ -44,7 +56,18 @@ function BacklogBoard() {
 
     useEffect(() => {
         fetchItems();
-    }, []);
+        fetchStatus();
+
+        // Auto-refresh status every 5 seconds if prioritization is running
+        const interval = setInterval(() => {
+            if (prioritizationStatus?.status === 'running') {
+                fetchStatus();
+                fetchItems(); // Also refresh items to show updated results
+            }
+        }, 5000);
+
+        return () => clearInterval(interval);
+    }, [prioritizationStatus?.status]);
 
     // Calculate statistics
     const stats = {
@@ -137,6 +160,53 @@ function BacklogBoard() {
                         </div>
                     </div>
                 </div>
+
+                {/* Prioritization Status Indicator */}
+                {prioritizationStatus && prioritizationStatus.status !== 'none' && (
+                    <div className={`mb-2 p-2 rounded-lg border ${prioritizationStatus.status === 'running'
+                        ? 'bg-yellow-50 border-yellow-200'
+                        : prioritizationStatus.status === 'completed'
+                            ? 'bg-green-50 border-green-200'
+                            : 'bg-red-50 border-red-200'
+                        }`}>
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                {prioritizationStatus.status === 'running' && (
+                                    <>
+                                        <div className="animate-spin h-4 w-4 border-2 border-yellow-600 border-t-transparent rounded-full"></div>
+                                        <span className="text-sm font-medium text-yellow-800">
+                                            Priorização em andamento...
+                                        </span>
+                                    </>
+                                )}
+                                {prioritizationStatus.status === 'completed' && (
+                                    <>
+                                        <span className="text-green-600">✅</span>
+                                        <span className="text-sm font-medium text-green-800">
+                                            Última priorização: {new Date(prioritizationStatus.timestamp).toLocaleString('pt-BR')}
+                                        </span>
+                                    </>
+                                )}
+                                {prioritizationStatus.status === 'error' && (
+                                    <>
+                                        <span className="text-red-600">❌</span>
+                                        <span className="text-sm font-medium text-red-800">
+                                            Erro na priorização
+                                        </span>
+                                    </>
+                                )}
+                            </div>
+                            {prioritizationStatus.status === 'running' && (
+                                <button
+                                    onClick={fetchStatus}
+                                    className="text-xs text-yellow-700 hover:text-yellow-900 font-medium"
+                                >
+                                    Atualizar
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                )}
             </div>
 
             {sortedItems.length === 0 ? (

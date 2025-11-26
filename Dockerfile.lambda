@@ -29,5 +29,7 @@ COPY --from=builder /python/ ${LAMBDA_TASK_ROOT}/
 COPY app/ ${LAMBDA_TASK_ROOT}/app/
 COPY main_lambda.py ${LAMBDA_TASK_ROOT}/main_lambda.py
 
+# Nota: app/static já está incluído no COPY app/ acima
+
 # Definir o handler
 CMD ["main_lambda.handler"]

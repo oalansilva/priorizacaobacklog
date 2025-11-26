@@ -26,7 +26,7 @@ def get_agent_executor(repository: DatabaseRepository):
     settings = get_settings()
     llm = get_llm(settings)
 
-    tools = [add_backlog_item, list_backlog_items, prioritize_backlog]
+    tools = [add_backlog_item, list_backlog_items, check_prioritization_status, prioritize_backlog]
 
     # LangGraph's create_react_agent returns a CompiledGraph
     _agent_graph = create_react_agent(llm, tools=tools)
@@ -92,6 +92,40 @@ def list_backlog_items() -> str:
     return result
 
 @tool
+def check_prioritization_status() -> str:
+    """Verifica se uma priorização em andamento foi concluída.
+    
+    Use esta ferramenta quando:
+    - O usuário perguntar se a priorização terminou
+    - O usuário pedir para verificar o status
+    - Após iniciar uma priorização, para avisar o usuário quando concluir
+    
+    Returns:
+        Status da priorização: "running", "completed", ou "none"
+    """
+    if _repository is None:
+        return "Erro: Repositório não inicializado."
+    
+    settings = _repository.get_settings()
+    
+    if not settings.last_prioritization_status:
+        return "Nenhuma priorização em andamento."
+    
+    
+    if settings.last_prioritization_status == "running":
+        return "A priorização ainda está em andamento. Aguarde alguns momentos..."
+    
+    if settings.last_prioritization_status == "completed":
+        # Manter o status para exibição persistente na UI
+        return settings.last_prioritization_message or "Priorização concluída!"
+    
+    if settings.last_prioritization_status == "error":
+        # Manter o status para exibição persistente na UI
+        return settings.last_prioritization_message or "Erro na priorização."
+    
+    return "Status desconhecido."
+
+@tool
 def prioritize_backlog(capacidade_total: Optional[int] = None, percentual_sustentacao: Optional[int] = None) -> str:
     """EXECUTE A PRIORIZAÇÃO COMPLETA DO BACKLOG usando IA para analisar e ordenar itens.
     
@@ -123,42 +157,74 @@ def prioritize_backlog(capacidade_total: Optional[int] = None, percentual_susten
     perc_sust = percentual_sustentacao if percentual_sustentacao is not None else settings_db.percentual_sustentacao
     
     try:
-        # Usar a função compartilhada de priorização
-        from app.main import execute_prioritization
+        # Executar priorização em thread separada para retornar imediatamente
+        import threading
         
-        result = execute_prioritization(
-            capacidade_total=cap_total,
-            percentual_sustentacao=perc_sust
-        )
-        
-        # Montar resposta formatada para o chat
-        priorizados = [i for i in result.itens if i.status == "Priorizado"]
-        despriorizados = [i for i in result.itens if i.status == "Despriorizado"]
-        
-        response = f"""✅ Priorização concluída com sucesso!
+        def run_prioritization_async():
+            """Executa priorização em background"""
+            try:
+                from app.main import execute_prioritization
+                result = execute_prioritization(
+                    capacidade_total=cap_total,
+                    percentual_sustentacao=perc_sust
+                )
+                
+                # Salvar status de conclusão no DynamoDB
+                priorizados = [i for i in result.itens if i.status == "Priorizado"]
+                completion_message = f"""✅ **Priorização concluída!**
 
-📊 **Resumo:**
+📊 **Resultados:**
+- {len(priorizados)} itens priorizados de {len(result.itens)} total
+- Capacidade: {result.capacidade_iniciativas}h
+- Alocado: {result.horas_alocadas}h
+
+Veja todos os detalhes na aba 'Backlog'!"""
+                
+                # Salvar nas settings com timestamp
+                from datetime import datetime
+                settings_db.last_prioritization_status = "completed"
+                settings_db.last_prioritization_message = completion_message
+                settings_db.last_prioritization_time = datetime.utcnow().isoformat()
+                _repository.update_settings(settings_db)
+                
+            except Exception as e:
+                # Log error but don't fail the user-facing response
+                import traceback
+                print(f"Background prioritization error: {e}")
+                print(traceback.format_exc())
+                
+                # Salvar status de erro
+                try:
+                    settings_db.last_prioritization_status = "error"
+                    settings_db.last_prioritization_message = f"Erro: {str(e)}"
+                    _repository.update_settings(settings_db)
+                except:
+                    pass
+        
+        # Limpar status anterior
+        settings_db.last_prioritization_status = "running"
+        settings_db.last_prioritization_message = None
+        _repository.update_settings(settings_db)
+        
+        # Iniciar thread de background
+        thread = threading.Thread(target=run_prioritization_async, daemon=True)
+        thread.start()
+        
+        # Retornar imediatamente com mensagem de confirmação
+        response = """✅ **Priorização iniciada com sucesso!**
+
+A análise está sendo processada em segundo plano. Isso pode levar alguns momentos.
+
+📊 **Configuração:**
 - Capacidade total: {cap_total}h
-- Sustentação ({perc_sust}%): {cap_total * perc_sust / 100}h
-- Capacidade para iniciativas: {result.capacidade_iniciativas}h
-- Horas alocadas: {result.horas_alocadas}h
+- Sustentação: {perc_sust}%
 
-✅ **Itens Priorizados ({len(priorizados)}):**
-"""
-        for item in priorizados[:5]:  # Mostrar top 5
-            response += f"\n{item.prioridade}. {item.item} ({item.horas}h)"
-        
-        if len(priorizados) > 5:
-            response += f"\n... e mais {len(priorizados) - 5} itens"
-        
-        if despriorizados:
-            response += f"\n\n❌ **Itens Despriorizados ({len(despriorizados)}):**"
-            for item in despriorizados[:3]:
-                response += f"\n- {item.item} ({item.horas}h)\n  *Justificativa: {item.justificativa}*"
-            if len(despriorizados) > 3:
-                response += f"\n... e mais {len(despriorizados) - 3} itens"
-        
-        response += "\n\nVocê pode visualizar todos os itens atualizados na aba 'Backlog'."
+Você pode visualizar os resultados atualizados na aba 'Backlog' em breve.
+
+💡 *Dica: Não é necessário esperar - você pode continuar usando o sistema normalmente.*""".format(
+            cap_total=cap_total,
+            perc_sust=perc_sust
+        )
         
         return response
         

@@ -29,3 +29,14 @@ def delete_item(item_id: str, repo: DatabaseRepository = Depends(get_repository)
     if not deleted:
         raise HTTPException(status_code=404, detail="Item not found")
     return {"message": "Item deleted successfully", "id": item_id}
+
+@router.get("/prioritization-status")
+def get_prioritization_status(repo: DatabaseRepository = Depends(get_repository)):
+    """Get the current status of prioritization."""
+    settings = repo.get_settings()
+    
+    return {
+        "status": settings.last_prioritization_status or "none",
+        "message": settings.last_prioritization_message,
+        "timestamp": settings.last_prioritization_time
+    }

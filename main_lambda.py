@@ -6,6 +6,10 @@ from mangum import Mangum
 
 from app.main import app
 
-handler = Mangum(app, api_gateway_base_path="/prod")
+# Handler para API Gateway
+handler = Mangum(app)
+
+# Alias para compatibilidade
+lambda_handler = handler
 
 

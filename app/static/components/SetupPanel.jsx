@@ -15,7 +15,7 @@ function SetupPanel() {
     useEffect(() => {
         const fetchSettings = async () => {
             try {
-                const response = await axios.get('/settings/');
+                const response = await axios.get('settings/');
                 if (response.data) setSettings(response.data);
             } catch (error) {
                 console.error("Erro ao carregar configurações:", error);
@@ -34,7 +34,7 @@ function SetupPanel() {
 
     const saveSettings = async () => {
         try {
-            await axios.put('/settings/', settings);
+            await axios.put('settings/', settings);
             setSaved(true);
             setTimeout(() => setSaved(false), 3000);
         } catch (error) {

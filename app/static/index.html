@@ -4,6 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <base href="/prod/">
     <title>Gênio Priorizador de Backlog</title>
     <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
@@ -44,6 +45,7 @@
             -webkit-line-clamp: 1;
             -webkit-box-orient: vertical;
             overflow: hidden;
+            line-clamp: 1;
         }
     </style>
 </head>
@@ -52,11 +54,11 @@
     <div id="root" class="h-full flex flex-col"></div>
 
     <!-- Load components in order -->
-    <script type="text/babel" src="/static/components/EditItemModal.jsx"></script>
-    <script type="text/babel" src="/static/components/ChatInterface.jsx"></script>
-    <script type="text/babel" src="/static/components/SetupPanel.jsx"></script>
-    <script type="text/babel" src="/static/components/BacklogBoard.jsx"></script>
-    <script type="text/babel" src="/static/components/App.jsx"></script>
+    <script type="text/babel" src="static/components/EditItemModal.jsx"></script>
+    <script type="text/babel" src="static/components/ChatInterface.jsx"></script>
+    <script type="text/babel" src="static/components/SetupPanel.jsx"></script>
+    <script type="text/babel" src="static/components/BacklogBoard.jsx"></script>
+    <script type="text/babel" src="static/components/App.jsx"></script>
 
     <!-- Initialize app -->
     <script type="text/babel">
