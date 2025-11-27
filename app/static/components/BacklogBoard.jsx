@@ -130,32 +130,32 @@ function BacklogBoard() {
                 </div>
             )}
 
-            <div className="sticky top-0 bg-gray-50 z-10 pb-3">
-                <div className="flex justify-between items-center mb-3">
-                    <h2 className="text-xl font-bold text-gray-800">Backlog de Demandas</h2>
-                    <button onClick={fetchItems} className="text-indigo-600 hover:text-indigo-800 text-sm font-medium">Atualizar</button>
+            <div className="sticky top-0 bg-gray-50 z-10 pb-2 sm:pb-3">
+                <div className="flex justify-between items-center mb-2 sm:mb-3">
+                    <h2 className="text-lg sm:text-xl font-bold text-gray-800">Backlog de Demandas</h2>
+                    <button onClick={fetchItems} className="text-indigo-600 hover:text-indigo-800 text-xs sm:text-sm font-medium">Atualizar</button>
                 </div>
 
                 {/* Summary Statistics */}
-                <div className="grid grid-cols-3 gap-2 mb-2">
-                    <div className="bg-green-50 border border-green-200 rounded-lg p-2">
+                <div className="grid grid-cols-3 gap-1.5 sm:gap-2 mb-2">
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-1.5 sm:p-2">
                         <div className="text-xs font-medium text-green-700 mb-0.5">✅ Priorizados</div>
-                        <div className="flex items-baseline gap-2">
-                            <span className="text-lg font-bold text-green-900">{stats.priorizados.count}</span>
+                        <div className="flex items-baseline gap-1 sm:gap-2">
+                            <span className="text-base sm:text-lg font-bold text-green-900">{stats.priorizados.count}</span>
                             <span className="text-xs text-green-600">{stats.priorizados.hours}h</span>
                         </div>
                     </div>
-                    <div className="bg-red-50 border border-red-200 rounded-lg p-2">
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-1.5 sm:p-2">
                         <div className="text-xs font-medium text-red-700 mb-0.5">❌ Despriorizados</div>
-                        <div className="flex items-baseline gap-2">
-                            <span className="text-lg font-bold text-red-900">{stats.despriorizados.count}</span>
+                        <div className="flex items-baseline gap-1 sm:gap-2">
+                            <span className="text-base sm:text-lg font-bold text-red-900">{stats.despriorizados.count}</span>
                             <span className="text-xs text-red-600">{stats.despriorizados.hours}h</span>
                         </div>
                     </div>
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-2">
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-1.5 sm:p-2">
                         <div className="text-xs font-medium text-blue-700 mb-0.5">🆕 Novos</div>
-                        <div className="flex items-baseline gap-2">
-                            <span className="text-lg font-bold text-blue-900">{stats.novos.count}</span>
+                        <div className="flex items-baseline gap-1 sm:gap-2">
+                            <span className="text-base sm:text-lg font-bold text-blue-900">{stats.novos.count}</span>
                             <span className="text-xs text-blue-600">{stats.novos.hours}h</span>
                         </div>
                     </div>
@@ -216,20 +216,20 @@ function BacklogBoard() {
             ) : (
                 <div className="grid gap-2">
                     {sortedItems.map(item => (
-                        <div key={item.id} className="bg-white p-3 rounded-lg shadow-sm border-l-4 border-indigo-500 hover:shadow-md transition-shadow">
-                            <div className="flex justify-between items-start gap-3">
+                        <div key={item.id} className="bg-white p-2 sm:p-3 rounded-lg shadow-sm border-l-4 border-indigo-500 hover:shadow-md transition-shadow">
+                            <div className="flex justify-between items-start gap-2 sm:gap-3">
                                 <div className="flex-1 min-w-0">
                                     <div className="flex justify-between items-start gap-2 mb-1">
-                                        <h3 className="font-bold text-base text-gray-900 truncate flex-1">
+                                        <h3 className="font-bold text-sm sm:text-base text-gray-900 flex-1 break-words">
                                             {item.prioridade && item.prioridade < 999 ? (
-                                                <span className="mr-2 inline-flex items-center justify-center w-6 h-6 bg-indigo-100 text-indigo-800 text-xs font-bold rounded-full">
+                                                <span className="mr-2 inline-flex items-center justify-center w-5 h-5 sm:w-6 sm:h-6 bg-indigo-100 text-indigo-800 text-xs font-bold rounded-full">
                                                     #{item.prioridade}
                                                 </span>
                                             ) : null}
                                             {item.titulo}
                                         </h3>
-                                        <div className="flex items-center gap-1.5 flex-shrink-0">
-                                            <span className={`px-2 py-0.5 rounded text-xs font-semibold ${item.status === 'Priorizado' ? 'bg-green-100 text-green-800' :
+                                        <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
+                                            <span className={`px-1.5 sm:px-2 py-0.5 rounded text-xs font-semibold ${item.status === 'Priorizado' ? 'bg-green-100 text-green-800' :
                                                 item.status === 'Despriorizado' ? 'bg-red-100 text-red-800' :
                                                     'bg-blue-100 text-blue-800'
                                                 }`}>
@@ -238,7 +238,7 @@ function BacklogBoard() {
                                             {item.justificativa && (
                                                 <button
                                                     onClick={() => setViewingJustification(item)}
-                                                    className="text-gray-400 hover:text-blue-600 p-1 rounded hover:bg-blue-50 transition-colors"
+                                                    className="text-gray-400 hover:text-blue-600 p-0.5 sm:p-1 rounded hover:bg-blue-50 transition-colors text-sm"
                                                     title="Ver Justificativa"
                                                 >
                                                     💬
@@ -246,23 +246,23 @@ function BacklogBoard() {
                                             )}
                                             <button
                                                 onClick={() => setEditingItem(item)}
-                                                className="text-gray-400 hover:text-indigo-600 p-1 rounded hover:bg-indigo-50 transition-colors"
+                                                className="text-gray-400 hover:text-indigo-600 p-0.5 sm:p-1 rounded hover:bg-indigo-50 transition-colors text-sm"
                                                 title="Editar Item"
                                             >
                                                 ✎
                                             </button>
                                             <button
                                                 onClick={() => handleDeleteItem(item.id, item.titulo)}
-                                                className="text-gray-400 hover:text-red-600 p-1 rounded hover:bg-red-50 transition-colors"
+                                                className="text-gray-400 hover:text-red-600 p-0.5 sm:p-1 rounded hover:bg-red-50 transition-colors text-sm"
                                                 title="Deletar Item"
                                             >
                                                 🗑️
                                             </button>
                                         </div>
                                     </div>
-                                    <p className="text-gray-600 text-sm line-clamp-1 mb-2">{item.descricao}</p>
+                                    <p className="text-gray-600 text-xs sm:text-sm line-clamp-1 mb-2">{item.descricao}</p>
 
-                                    <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-600 mb-2">
+                                    <div className="flex flex-wrap gap-x-2 sm:gap-x-3 gap-y-1 text-xs text-gray-600 mb-2">
                                         <span className="flex items-center gap-1">
                                             ⏱️ <span className="font-medium text-gray-700">{item.esforco_estimado}h</span>
                                         </span>
@@ -276,7 +276,7 @@ function BacklogBoard() {
                                         )}
                                     </div>
 
-                                    <div className="flex flex-wrap gap-1.5">
+                                    <div className="flex flex-wrap gap-1 sm:gap-1.5">
                                         {item.impacto_financeiro === 'Sim' && (
                                             <span className="px-1.5 py-0.5 bg-green-50 text-green-700 rounded text-xs font-medium">💰 Financeiro</span>
                                         )}
