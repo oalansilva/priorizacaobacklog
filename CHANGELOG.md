@@ -7,37 +7,51 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2025-11-26
+
 ### Added
-- Migração completa para AWS DynamoDB
-- Campo de prioridade numérica (1 a N)
-- Ordenação automática do backlog por prioridade
-- Badge visual de prioridade (#N) antes do título
-- Documentação reorganizada em estrutura `docs/`
-- Scripts utilitários movidos para `scripts/`
-- Guia de organização de documentação
+- **Priorização Assíncrona**: Execução em background via threading para evitar timeouts.
+- **Notificação de Status**: Sistema de feedback em tempo real sobre o status da priorização.
+- **Design Responsivo**: Interface otimizada para dispositivos móveis (Mobile First).
+- **Status UI**: Banner visual na tela de Backlog mostrando status (running/completed/error).
+- **Endpoint de Status**: Novo endpoint `/items/prioritization-status`.
+- **Agent Tool**: Nova ferramenta `check_prioritization_status` para o agente.
+- **Histórico Persistente**: Status da última priorização salvo no DynamoDB.
 
 ### Changed
-- Banco de dados padrão alterado de SQLite para DynamoDB
-- Nomenclatura de arquivos .md para kebab-case
-- README.md simplificado e modernizado
-- Interface do backlog agora ordena por prioridade
+- **Performance**: Remoção de logs excessivos para melhor desempenho.
+- **Segurança**: Atualização do CSP para permitir scripts inline necessários.
+- **UX**: Auto-refresh inteligente do status na interface.
+
+## [0.1.1] - 2025-11-25
+
+### Added
+- Migração completa para AWS DynamoDB.
+- Campo de prioridade numérica (1 a N).
+- Ordenação automática do backlog por prioridade.
+- Badge visual de prioridade (#N) antes do título.
+
+### Changed
+- Banco de dados padrão alterado de SQLite para DynamoDB.
+- Interface do backlog agora ordena por prioridade.
 
 ### Fixed
-- Erro "database is locked" do SQLite eliminado
-- Persistência de dados de priorização no banco
-- Exibição de números de prioridade na interface
+- Erro "database is locked" do SQLite eliminado.
+- Persistência de dados de priorização no banco.
 
 ## [0.1.0] - 2025-11-24
 
 ### Added
-- Sistema de priorização com AWS Bedrock
-- Interface web com React
-- API REST com FastAPI
-- Funcionalidade de chat conversacional
-- Exclusão de itens do backlog
-- Pesos configuráveis para priorização
-- Testes locais e em produção
-- Massa de dados de teste
+- Sistema de priorização com AWS Bedrock.
+- Interface web com React.
+- API REST com FastAPI.
+- Funcionalidade de chat conversacional.
+- Exclusão de itens do backlog.
+- Pesos configuráveis para priorização.
+- Testes locais e em produção.
+- Massa de dados de teste.
 
-[Unreleased]: https://github.com/seu-usuario/priorizacaobacklog/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/seu-usuario/priorizacaobacklog/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/seu-usuario/priorizacaobacklog/compare/v0.1.1...v0.2.0
+[0.1.1]: https://github.com/seu-usuario/priorizacaobacklog/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/seu-usuario/priorizacaobacklog/releases/tag/v0.1.0

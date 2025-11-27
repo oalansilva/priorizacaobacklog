@@ -35,7 +35,8 @@ Acesse: **http://localhost:8000**
 
 - ✅ Priorização inteligente de backlog usando IA
 - ✅ Análise de impacto (financeiro, negócios, cliente, OKR)
-- ✅ Interface web interativa
+- ✅ Interface web interativa e **Responsiva (Mobile First)** 📱
+- ✅ **Priorização Assíncrona** com notificação de status em tempo real ⚡
 - ✅ API REST completa
 - ✅ Persistência em DynamoDB
 - ✅ Ordenação por prioridade numérica (1 a N)

@@ -15,19 +15,6 @@ Você precisa de:
 4. Escolha **Command Line Interface (CLI)**
 5. Copie o **Access Key ID** e **Secret Access Key**
 
-### Opção B: Se já tem credenciais
-
-Se você já tem credenciais AWS, pode usar diretamente.
-
-## 2. Configurar Credenciais no Seu Computador
-
-### Método 1: AWS CLI (Recomendado)
-
-```bash
-# Instalar AWS CLI (se não tiver)
-# Windows: baixe de https://aws.amazon.com/cli/
-# Ou via pip: pip install awscli
-
 # Configurar credenciais
 aws configure
 ```
