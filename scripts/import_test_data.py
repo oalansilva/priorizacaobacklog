@@ -12,7 +12,8 @@ def import_data():
     repo = get_repository()
     
     try:
-        with open('massa_teste_10_itens.json', 'r', encoding='utf-8') as f:
+        data_path = os.path.join(os.path.dirname(__file__), 'data', 'massa_teste_10_itens.json')
+        with open(data_path, 'r', encoding='utf-8') as f:
             items_data = json.load(f)
             
         print(f"Found {len(items_data)} items to import.")
