@@ -49,12 +49,10 @@ function ChatInterface({ messages, setMessages, conversationId, setConversationI
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) {
-                    console.log("Stream complete");
                     break;
                 }
 
                 const chunk = decoder.decode(value, { stream: true });
-                console.log("Received chunk:", chunk.length, "chars");
 
                 setMessages(prev => {
                     const newMessages = [...prev];

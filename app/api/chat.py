@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 @router.post("/", response_model=None)
 async def chat(request: ChatRequest, repo: DatabaseRepository = Depends(get_repository)):
-    logger.info(f"Chat endpoint called for conversation {request.conversation_id}")
+    logger.debug(f"Chat endpoint called for conversation {request.conversation_id}")
     # 1. Retrieve or create conversation
     if request.conversation_id:
         conversation = repo.get_conversation(request.conversation_id)
@@ -86,11 +86,11 @@ async def chat(request: ChatRequest, repo: DatabaseRepository = Depends(get_repo
                         logger.error(f"Error processing chunk: {chunk_error}")
                         continue
             
-            logger.info(f"Stream finished. Total events: {event_count}. Response length: {len(full_response)}")
+            logger.debug(f"Stream finished. Total events: {event_count}. Response length: {len(full_response)}")
 
             # 5. Add agent response to DB model (after streaming completes)
             if full_response:
-                logger.info(f"Stream complete, saving conversation {conversation.id}")
+                logger.debug(f"Stream complete, saving conversation {conversation.id}")
                 conversation.messages.append(ConversationMessage(role="assistant", content=full_response))
                 repo.save_conversation(conversation)
             else:

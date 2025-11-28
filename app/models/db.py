@@ -12,6 +12,7 @@ class BacklogItem(BaseModel):
     dependencias: Optional[str] = None
     status: str = "Novo"  # Novo, Priorizado, Despriorizado
     prioridade: int = 999  # 1 a N, onde 1 é mais prioritário
+    score: float = 0.0  # 0 a 100, calculado na priorização
     created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
     
     # Novos campos Sim/Não

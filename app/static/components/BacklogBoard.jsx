@@ -295,6 +295,11 @@ function BacklogBoard() {
                                         {item.estimado_qp === 'Sim' && (
                                             <span className="px-1.5 py-0.5 bg-indigo-50 text-indigo-700 rounded text-xs font-medium">📋 QP</span>
                                         )}
+                                        {item.score !== undefined && item.score > 0 && (
+                                            <span className="px-1.5 py-0.5 bg-yellow-100 text-yellow-800 rounded text-xs font-bold border border-yellow-300 flex items-center gap-1">
+                                                ⭐ {item.score}%
+                                            </span>
+                                        )}
                                     </div>
                                 </div>
                             </div>

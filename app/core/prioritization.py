@@ -64,7 +64,7 @@ class PrioritizationService:
         capacidade_iniciativas = self._calcular_capacidade_iniciativas(
             capacidade, percentual
         )
-        self.logger.info(
+        self.logger.debug(
             "process_dataframe.start",
             capacidade_total=capacidade,
             percentual_sustentacao=percentual,
@@ -85,7 +85,7 @@ class PrioritizationService:
         roadmap_url = (
             self.storage.generate_presigned_url(s3_key) if s3_key is not None else None
         )
-        self.logger.info(
+        self.logger.debug(
             "process_dataframe.end",
             horas_alocadas=horas_alocadas,
             total_itens=len(priorizado),
@@ -106,7 +106,7 @@ class PrioritizationService:
                 estimado_qp=row.get("estimado_qp"),
                 categoria=row.get("categoria"),
                 area=row.get("area"),
-                outros_dados=None,
+                outros_dados={"score": float(row.get("score", 0.0))},
             )
             for _, row in priorizado.iterrows()
         ]
@@ -353,7 +353,7 @@ class PrioritizationService:
         df.loc[mask_priorizado, "prioridade"] = range(1, mask_priorizado.sum() + 1)
         df.loc[~mask_priorizado, "prioridade"] = 999
         
-        self.logger.info(
+        self.logger.debug(
             "priority_assignment",
             num_priorizados=mask_priorizado.sum(),
             num_despriorizados=(~mask_priorizado).sum(),
@@ -361,6 +361,44 @@ class PrioritizationService:
             prioridades_despriorizados=df.loc[~mask_priorizado, "prioridade"].tolist() if (~mask_priorizado).sum() > 0 else []
         )
         
+        # Calcular Score
+        # Obter pesos atuais (já carregados em 'weights' no método anterior, mas precisamos aqui também)
+        # Como _aplicar_status_e_prioridade é chamado após _obter_priorizacao_da_ia, podemos recalcular ou passar os pesos.
+        # Para simplificar, vamos buscar novamente do banco ou usar defaults
+        from app.core.database import get_repository
+        repo = get_repository()
+        db_settings = repo.get_settings()
+        
+        peso_fin = db_settings.peso_financeiro
+        peso_neg = db_settings.peso_negocios
+        peso_cli = db_settings.peso_cliente
+        peso_okr = db_settings.peso_okr
+        total_pesos = peso_fin + peso_neg + peso_cli + peso_okr
+        
+        def calcular_score(row):
+            # 1. Must Have = 100%
+            if "must_have" in row and str(row["must_have"]).lower() == "sim":
+                return 100.0
+            
+            # 2. Calcular com base nos pesos
+            score = 0.0
+            
+            # Helper para converter Sim/Não em 1/0
+            def val(col):
+                v = str(row.get(col, "não")).lower()
+                return 1.0 if v == "sim" else 0.0
+            
+            if total_pesos > 0:
+                score += val("financeiro") * peso_fin
+                score += val("negocio") * peso_neg
+                score += val("cliente") * peso_cli
+                score += val("okr") * peso_okr
+                score = (score / total_pesos) * 100.0
+            
+            return round(score, 1)
+
+        df["score"] = df.apply(calcular_score, axis=1)
+
         return df
 
 

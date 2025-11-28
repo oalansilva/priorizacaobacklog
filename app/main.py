@@ -232,6 +232,11 @@ def execute_prioritization(
             original_item.status = prioritized_item.status
             original_item.prioridade = prioritized_item.prioridade
             original_item.justificativa = prioritized_item.justificativa
+            
+            # Update score if available
+            if prioritized_item.outros_dados and "score" in prioritized_item.outros_dados:
+                original_item.score = prioritized_item.outros_dados["score"]
+                
             repo.update_item(original_item)
             updated_count += 1
         else:

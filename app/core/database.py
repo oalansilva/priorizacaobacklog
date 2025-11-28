@@ -88,6 +88,12 @@ class SQLiteRepository(DatabaseRepository):
             except sqlite3.OperationalError:
                 pass
 
+            # Migration: Add score column if not exists
+            try:
+                conn.execute("ALTER TABLE items ADD COLUMN score REAL DEFAULT 0.0")
+            except sqlite3.OperationalError:
+                pass
+
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS conversations (
                     id TEXT PRIMARY KEY,
@@ -125,13 +131,14 @@ class SQLiteRepository(DatabaseRepository):
     def add_item(self, item: BacklogItem) -> BacklogItem:
         with sqlite3.connect(self.db_path) as conn:
             conn.execute(
-                "INSERT INTO items VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO items VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     item.id, item.titulo, item.descricao,
                     item.esforco_estimado, item.area, item.dependencias,
                     item.status, item.prioridade, item.created_at,
                     item.categoria, item.impacto_financeiro, item.impacto_negocios,
-                    item.impacto_cliente, item.okr, item.must_have, item.estimado_qp, item.justificativa
+                    item.impacto_cliente, item.okr, item.must_have, item.estimado_qp, item.justificativa,
+                    item.score
                 )
             )
         return item
@@ -141,12 +148,15 @@ class SQLiteRepository(DatabaseRepository):
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.execute("SELECT * FROM items ORDER BY prioridade ASC, created_at ASC")
             for row in cursor:
+                # Handle potential missing columns if DB schema varies (though migration should fix it)
+                # Assuming schema matches add_item order
                 items.append(BacklogItem(
                     id=row[0], titulo=row[1], descricao=row[2],
                     esforco_estimado=row[3], area=row[4], dependencias=row[5],
                     status=row[6], prioridade=row[7], created_at=row[8],
                     categoria=row[9], impacto_financeiro=row[10], impacto_negocios=row[11],
-                    impacto_cliente=row[12], okr=row[13], must_have=row[14], estimado_qp=row[15], justificativa=row[16]
+                    impacto_cliente=row[12], okr=row[13], must_have=row[14], estimado_qp=row[15], justificativa=row[16],
+                    score=row[17] if len(row) > 17 else 0.0
                 ))
         return items
 
@@ -174,13 +184,13 @@ class SQLiteRepository(DatabaseRepository):
             conn.execute(
                 """UPDATE items SET titulo=?, descricao=?, esforco_estimado=?, 
                    area=?, dependencias=?, status=?, prioridade=?, categoria=?, impacto_financeiro=?, 
-                   impacto_negocios=?, impacto_cliente=?, okr=?, must_have=?, estimado_qp=?, justificativa=? WHERE id=?""",
+                   impacto_negocios=?, impacto_cliente=?, okr=?, must_have=?, estimado_qp=?, justificativa=?, score=? WHERE id=?""",
                 (
                     item.titulo, item.descricao,
                     item.esforco_estimado, item.area, item.dependencias,
                     item.status, item.prioridade, item.categoria, item.impacto_financeiro,
                     item.impacto_negocios, item.impacto_cliente, item.okr, item.must_have, item.estimado_qp,
-                    item.justificativa,
+                    item.justificativa, item.score,
                     item.id
                 )
             )
@@ -244,10 +254,21 @@ class DynamoDBRepository(DatabaseRepository):
         self.table_conversations = self.dynamodb.Table(self.settings.dynamodb_table_conversations)
         self.table_settings = self.dynamodb.Table(self.settings.dynamodb_table_settings)
 
+    def _convert_floats_to_decimals(self, obj):
+        from decimal import Decimal
+        if isinstance(obj, float):
+            return Decimal(str(obj))
+        elif isinstance(obj, dict):
+            return {k: self._convert_floats_to_decimals(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [self._convert_floats_to_decimals(v) for v in obj]
+        return obj
+
     def add_item(self, item: BacklogItem) -> BacklogItem:
         # Convert float/int to Decimal is handled by boto3 for standard types, 
         # but we need to ensure dict format is clean
         item_dict = item.model_dump()
+        item_dict = self._convert_floats_to_decimals(item_dict)
         self.table_items.put_item(Item=item_dict)
         return item
 
@@ -279,11 +300,15 @@ class DynamoDBRepository(DatabaseRepository):
         return None
 
     def save_conversation(self, conversation: Conversation) -> Conversation:
-        self.table_conversations.put_item(Item=conversation.model_dump())
+        data = conversation.model_dump()
+        data = self._convert_floats_to_decimals(data)
+        self.table_conversations.put_item(Item=data)
         return conversation
 
     def update_item(self, item: BacklogItem) -> BacklogItem:
-        self.table_items.put_item(Item=item.model_dump())
+        item_dict = item.model_dump()
+        item_dict = self._convert_floats_to_decimals(item_dict)
+        self.table_items.put_item(Item=item_dict)
         return item
 
     def clear_items(self) -> None:
@@ -314,7 +339,9 @@ class DynamoDBRepository(DatabaseRepository):
         return default_settings
 
     def update_settings(self, settings: SystemSettings) -> SystemSettings:
-        self.table_settings.put_item(Item=settings.model_dump())
+        data = settings.model_dump()
+        data = self._convert_floats_to_decimals(data)
+        self.table_settings.put_item(Item=data)
         return settings
 
 
