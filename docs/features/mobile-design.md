@@ -11,8 +11,8 @@ Adotamos uma abordagem **Mobile First**, priorizando a experiência em telas peq
 ### Principais Adaptações
 
 #### 1. Header Responsivo
--   **Desktop**: Exibe "🤖 Gênio Priorizador" e botões com padding generoso.
--   **Mobile**: Simplifica para "🤖 Priorizador" e reduz o tamanho dos botões para caber na largura da tela.
+-   **Desktop**: Exibe "🤖 ARCADIA – Autonomous Roadmap & Decision AI" e botões com padding generoso.
+-   **Mobile**: Simplifica para "🤖 ARCADIA" e reduz o tamanho dos botões para caber na largura da tela.
 
 #### 2. Backlog Board
 -   **Grid de Estatísticas**:
@@ -39,8 +39,8 @@ Utilizamos as classes utilitárias do **Tailwind CSS** com prefixos responsivos:
 
 ```jsx
 <h1 className="text-lg sm:text-xl font-bold">
-    🤖 <span className="hidden sm:inline">Gênio Priorizador</span>
-       <span className="sm:hidden">Priorizador</span>
+    🤖 <span className="hidden sm:inline">ARCADIA – Autonomous Roadmap & Decision AI</span>
+       <span className="sm:hidden">ARCADIA</span>
 </h1>
 ```
 

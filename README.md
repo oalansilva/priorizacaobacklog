@@ -1,4 +1,4 @@
-# 🎯 Prioriza Backlog
+# 🎯 ARCADIA – Autonomous Roadmap & Decision AI
 
 Sistema inteligente de priorização de backlog usando IA (AWS Bedrock + Claude).
 
