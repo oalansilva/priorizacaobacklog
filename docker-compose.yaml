@@ -9,7 +9,7 @@ services:
       AWS_REGION: us-east-1
       STORAGE_BUCKET: ""
       LLM_PROVIDER: bedrock
-      BEDROCK_MODEL_ID: anthropic.claude-3-sonnet-20240229-v1:0
+      BEDROCK_MODEL_ID: us.anthropic.claude-sonnet-4-5-20250929-v1:0
     ports:
       - "8000:8000"
     depends_on:

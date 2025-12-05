@@ -54,7 +54,7 @@ aws bedrock list-foundation-models --region us-east-1 --query "modelSummaries[?c
 
 Os modelos mais comuns do Anthropic Claude disponíveis:
 
-- `anthropic.claude-3-sonnet-20240229-v1:0` (já configurado - bom custo/benefício)
+- `us.anthropic.claude-sonnet-4-5-20250929-v1:0` (já configurado - bom custo/benefício)
 - `anthropic.claude-3-haiku-20240307-v1:0` (mais rápido e barato)
 - `anthropic.claude-3-opus-20240229-v1:0` (mais poderoso, mais caro)
 - `anthropic.claude-3-5-sonnet-20241022-v2:0` (versão mais recente)
@@ -94,7 +94,7 @@ AWS_SECRET_ACCESS_KEY=sua-secret-key
 
 # Configurações Bedrock
 AWS_REGION=us-east-1
-BEDROCK_MODEL_ID=anthropic.claude-3-sonnet-20240229-v1:0
+BEDROCK_MODEL_ID=us.anthropic.claude-sonnet-4-5-20250929-v1:0
 LLM_PROVIDER=bedrock
 
 # Configurações padrão

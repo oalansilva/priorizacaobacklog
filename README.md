@@ -60,7 +60,7 @@ Acesse: **http://localhost:8000**
 ## 🛠️ Tecnologias
 
 - **Backend**: FastAPI, Python 3.11
-- **IA**: AWS Bedrock (Claude 3.5 Sonnet)
+- **IA**: AWS Bedrock (Claude 4.5 Sonnet)
 - **Banco de Dados**: AWS DynamoDB
 - **Frontend**: React (vanilla JS)
 - **Deploy**: Docker, AWS Lambda
@@ -108,7 +108,10 @@ Contribuições são bem-vindas! Por favor:
 
 ## 📄 Licença
 
-Este projeto está sob a licença MIT.
+Este projeto é proprietário e confidencial.
+Copyright © 2025 Alan Silva. Todos os direitos reservados.
+
+É proibida a cópia, distribuição, modificação ou uso deste código sem autorização expressa do autor.
 
 ## 📞 Suporte
 

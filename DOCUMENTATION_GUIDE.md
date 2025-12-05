@@ -160,7 +160,8 @@ Veja [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## 📄 Licença
 
-MIT License - veja [LICENSE](LICENSE)
+Proprietary License - Todos os direitos reservados
+
 ```
 
 ## Próximos Passos Recomendados
