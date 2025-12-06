@@ -23,7 +23,7 @@ def handle_async_prioritization(event):
         
         # Atualizar status no DynamoDB
         from app.core.database import get_repository
-        from datetime import datetime
+        from datetime import datetime, timezone, timedelta
         
         repo = get_repository()
         # É importante pegar settings atualizadas caso algo tenha mudado (embora improvável em poucos segundos)
@@ -39,9 +39,11 @@ def handle_async_prioritization(event):
 
 Veja todos os detalhes na aba 'Backlog'!"""
 
+        # São Paulo timezone (UTC-3)
+        sao_paulo_tz = timezone(timedelta(hours=-3))
         settings.last_prioritization_status = "completed"
         settings.last_prioritization_message = completion_message
-        settings.last_prioritization_time = datetime.utcnow().isoformat()
+        settings.last_prioritization_time = datetime.now(sao_paulo_tz).isoformat()
         repo.update_settings(settings)
         print("✅ Async Prioritization Completed Successfully")
         return {"status": "success", "message": "Prioritization completed"}

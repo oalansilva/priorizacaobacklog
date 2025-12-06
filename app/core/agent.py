@@ -215,7 +215,11 @@ Veja todos os detalhes na aba 'Backlog'!"""
                     current_settings = _repository.get_settings()
                     current_settings.last_prioritization_status = "completed"
                     current_settings.last_prioritization_message = completion_message
-                    current_settings.last_prioritization_time = datetime.utcnow().isoformat()
+                    from datetime import datetime, timezone, timedelta
+                    
+                    # São Paulo timezone (UTC-3)
+                    sao_paulo_tz = timezone(timedelta(hours=-3))
+                    current_settings.last_prioritization_time = datetime.now(sao_paulo_tz).isoformat()
                     _repository.update_settings(current_settings)
                     
                 except Exception as e:
