@@ -5,6 +5,15 @@ function App() {
     const [messages, setMessages] = useState([]);
     const [conversationId, setConversationId] = useState(null);
 
+    const [version, setVersion] = useState('');
+
+    React.useEffect(() => {
+        fetch('version')
+            .then(res => res.json())
+            .then(data => setVersion(data.version))
+            .catch(() => setVersion(''));
+    }, []);
+
     return (
         <div className="flex flex-col h-full max-w-5xl mx-auto w-full bg-white shadow-xl overflow-hidden">
             <header className="bg-indigo-600 text-white p-3 sm:p-4 flex justify-between items-center shrink-0">
@@ -33,17 +42,25 @@ function App() {
                 </nav>
             </header>
 
-            <main className="flex-1 overflow-hidden relative bg-gray-50">
-                {activeTab === 'chat' && (
-                    <ChatInterface
-                        messages={messages}
-                        setMessages={setMessages}
-                        conversationId={conversationId}
-                        setConversationId={setConversationId}
-                    />
+            <main className="flex-1 overflow-hidden relative bg-gray-50 flex flex-col">
+                <div className="flex-1 overflow-auto">
+                    {activeTab === 'chat' && (
+                        <ChatInterface
+                            messages={messages}
+                            setMessages={setMessages}
+                            conversationId={conversationId}
+                            setConversationId={setConversationId}
+                        />
+                    )}
+                    {activeTab === 'backlog' && <BacklogBoard />}
+                    {activeTab === 'setup' && <SetupPanel />}
+                </div>
+
+                {version && (
+                    <footer className="bg-gray-100 text-gray-400 text-xs py-1 px-4 text-right border-t border-gray-200 shrink-0">
+                        v{version}
+                    </footer>
                 )}
-                {activeTab === 'backlog' && <BacklogBoard />}
-                {activeTab === 'setup' && <SetupPanel />}
             </main>
         </div>
     );

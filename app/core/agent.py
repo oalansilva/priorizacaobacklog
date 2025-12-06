@@ -157,21 +157,52 @@ def prioritize_backlog(capacidade_total: Optional[int] = None, percentual_susten
     perc_sust = percentual_sustentacao if percentual_sustentacao is not None else settings_db.percentual_sustentacao
     
     try:
-        # Executar priorização em thread separada para retornar imediatamente
+        # Limpar status anterior e marcar como running
+        settings_db.last_prioritization_status = "running"
+        settings_db.last_prioritization_message = None
+        _repository.update_settings(settings_db)
+        
+        # Verificar se estamos em ambiente Lambda
+        import os
+        import json
+        import boto3
         import threading
         
-        def run_prioritization_async():
-            """Executa priorização em background"""
-            try:
-                from app.main import execute_prioritization
-                result = execute_prioritization(
-                    capacidade_total=cap_total,
-                    percentual_sustentacao=perc_sust
-                )
-                
-                # Salvar status de conclusão no DynamoDB
-                priorizados = [i for i in result.itens if i.status == "Priorizado"]
-                completion_message = f"""✅ **Priorização concluída!**
+        is_lambda = os.environ.get("AWS_LAMBDA_FUNCTION_NAME") is not None
+        
+        if is_lambda:
+            # Invocar a própria função Lambda assincronamente
+            lambda_client = boto3.client('lambda')
+            function_name = os.environ.get("AWS_LAMBDA_FUNCTION_NAME")
+            
+            payload = {
+                "type": "async_task",
+                "action": "prioritize",
+                "capacidade_total": cap_total,
+                "percentual_sustentacao": perc_sust
+            }
+            
+            lambda_client.invoke(
+                FunctionName=function_name,
+                InvocationType='Event',  # Asynchronous invocation
+                Payload=json.dumps(payload)
+            )
+            print("Invoked Async Lambda for prioritization")
+            
+        else:
+            # Ambiente local: usar Thread
+            def run_prioritization_async_local():
+                try:
+                    from app.main import execute_prioritization
+                    from datetime import datetime
+                    
+                    result = execute_prioritization(
+                        capacidade_total=cap_total,
+                        percentual_sustentacao=perc_sust
+                    )
+                    
+                    priorizados = [i for i in result.itens if i.status == "Priorizado"]
+                    completion_message = f"""✅ **Priorização concluída!**
 
 📊 **Resultados:**
 - {len(priorizados)} itens priorizados de {len(result.itens)} total
@@ -179,36 +210,29 @@ def prioritize_backlog(capacidade_total: Optional[int] = None, percentual_susten
 - Alocado: {result.horas_alocadas}h
 
 Veja todos os detalhes na aba 'Backlog'!"""
-                
-                # Salvar nas settings com timestamp
-                from datetime import datetime
-                settings_db.last_prioritization_status = "completed"
-                settings_db.last_prioritization_message = completion_message
-                settings_db.last_prioritization_time = datetime.utcnow().isoformat()
-                _repository.update_settings(settings_db)
-                
-            except Exception as e:
-                # Log error but don't fail the user-facing response
-                import traceback
-                print(f"Background prioritization error: {e}")
-                print(traceback.format_exc())
-                
-                # Salvar status de erro
-                try:
-                    settings_db.last_prioritization_status = "error"
-                    settings_db.last_prioritization_message = f"Erro: {str(e)}"
-                    _repository.update_settings(settings_db)
-                except:
-                    pass
-        
-        # Limpar status anterior
-        settings_db.last_prioritization_status = "running"
-        settings_db.last_prioritization_message = None
-        _repository.update_settings(settings_db)
-        
-        # Iniciar thread de background
-        thread = threading.Thread(target=run_prioritization_async, daemon=True)
-        thread.start()
+                    
+                    # Recarregar settings para garantir freshness
+                    current_settings = _repository.get_settings()
+                    current_settings.last_prioritization_status = "completed"
+                    current_settings.last_prioritization_message = completion_message
+                    current_settings.last_prioritization_time = datetime.utcnow().isoformat()
+                    _repository.update_settings(current_settings)
+                    
+                except Exception as e:
+                    import traceback
+                    print(f"Background prioritization error: {e}")
+                    print(traceback.format_exc())
+                    
+                    try:
+                        current_settings = _repository.get_settings()
+                        current_settings.last_prioritization_status = "error"
+                        current_settings.last_prioritization_message = f"Erro: {str(e)}"
+                        _repository.update_settings(current_settings)
+                    except:
+                        pass
+
+            thread = threading.Thread(target=run_prioritization_async_local, daemon=True)
+            thread.start()
         
         # Retornar imediatamente com mensagem de confirmação
         response = """✅ **Priorização iniciada com sucesso!**

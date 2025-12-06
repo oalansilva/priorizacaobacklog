@@ -183,7 +183,7 @@ function BacklogBoard() {
                                     <>
                                         <span className="text-green-600">✅</span>
                                         <span className="text-sm font-medium text-green-800">
-                                            Última priorização: {new Date(prioritizationStatus.timestamp).toLocaleString('pt-BR')}
+                                            Última priorização: {new Date(prioritizationStatus.timestamp).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}
                                         </span>
                                     </>
                                 )}

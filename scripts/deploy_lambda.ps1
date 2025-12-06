@@ -14,12 +14,49 @@ if (-not $ACCOUNT_ID) {
 }
 Write-Host "Account ID: $ACCOUNT_ID"
 
+# CHECK FOR DOCKER (Support for Rancher Desktop)
+if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
+    Write-Warning "Docker command not found in PATH. Checking Rancher Desktop..."
+    
+    $RancherDockerPath = "C:\Program Files\Rancher Desktop\resources\resources\win32\bin"
+    if (Test-Path "$RancherDockerPath\docker.exe") {
+        Write-Host "Found Docker in Rancher Desktop path. Adding to session PATH."
+        $env:PATH = "$RancherDockerPath;$env:PATH"
+        
+        # Switch to default context (Rancher usually listens on default pipe)
+        Write-Host "Switching Docker context to 'default'..."
+        try {
+            & docker context use default
+        }
+        catch {
+            Write-Warning "Failed to switch context to default. Deployment might fail if 'desktop-linux' is selected."
+        }
+    }
+    else {
+        Write-Error "Docker not found! Please install Docker Desktop or Rancher Desktop and ensure 'docker' is in your PATH."
+        exit 1
+    }
+}
+else {
+    # Check current context and switch if likely wrong
+    $currentContext = docker context show
+    if ($currentContext -eq "desktop-linux") {
+        Write-Warning "Current context is 'desktop-linux' which might be broken. Attempting switch to 'default'..."
+        try {
+            & docker context use default
+        }
+        catch {
+            Write-Warning "Failed to switch context."
+        }
+    }
+}
+
 $ECR_URI = "$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com"
 $FULL_IMAGE_URI = "$ECR_URI/$ECR_REPO_NAME`:$IMAGE_TAG"
 
 # 2. Login to ECR
 Write-Host "Logging in to ECR..."
-aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_URI
+aws ecr get-login-password --region $AWS_REGION | & docker login --username AWS --password-stdin $ECR_URI
 
 # 3. Create Repository if not exists
 Write-Host "Checking ECR Repository..."
@@ -31,6 +68,12 @@ if ($LASTEXITCODE -ne 0) {
 
 # 4. Build Docker Image
 Write-Host "Building Docker Image..."
+
+# Generate Version (Timestamp)
+$VERSION_DATE = Get-Date -Format "yyyyMMdd.HHmm"
+Write-Host "Injecting Version: $VERSION_DATE"
+Set-Content -Path "app/version.txt" -Value $VERSION_DATE
+
 # --provenance=false is required for AWS Lambda compatibility with newer Docker versions
 # --platform linux/amd64 ensures compatibility with Lambda x86_64 architecture
 docker build --provenance=false --platform linux/amd64 -f Dockerfile.lambda -t $ECR_REPO_NAME .
@@ -58,9 +101,6 @@ if ($LASTEXITCODE -eq 0) {
 else {
     Write-Host "Function does not exist. Creating..."
     # Note: You need a role ARN here. For now, we'll ask the user or fail if not provided.
-    # We will try to create a basic role or ask user to provide one.
-    # For simplicity in this script, we assume the user might need to create it manually first or we use a known role.
-    # Let's try to find a role or create one? Creating IAM roles via CLI is complex due to trust policies.
     
     Write-Warning "Lambda function '$LAMBDA_FUNC_NAME' does not exist."
     Write-Warning "Please create the function manually in AWS Console using the Container Image URI: $FULL_IMAGE_URI"

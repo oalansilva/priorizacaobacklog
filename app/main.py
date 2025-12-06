@@ -138,6 +138,19 @@ async def healthcheck() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@app.get("/version", tags=["Monitorização"])
+async def get_version() -> dict[str, str]:
+    """Retorna a versão da aplicação (timestamp do deploy)."""
+    try:
+        version_file = BASE_DIR / "version.txt"
+        if version_file.exists():
+            version = version_file.read_text().strip()
+            return {"version": version}
+        return {"version": "dev-local"}
+    except Exception:
+        return {"version": "unknown"}
+
+
 def execute_prioritization(
     capacidade_total: Optional[int] = None,
     percentual_sustentacao: Optional[int] = None,
