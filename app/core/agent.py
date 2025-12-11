@@ -26,7 +26,7 @@ def get_agent_executor(repository: DatabaseRepository):
     settings = get_settings()
     llm = get_llm(settings)
 
-    tools = [add_backlog_item, list_backlog_items, check_prioritization_status, prioritize_backlog]
+    tools = [add_backlog_item, find_backlog_item_by_title, update_backlog_item, list_backlog_items, check_prioritization_status, prioritize_backlog]
 
     # LangGraph's create_react_agent returns a CompiledGraph
     _agent_graph = create_react_agent(llm, tools=tools)
@@ -49,23 +49,238 @@ def add_backlog_item(
     esforco_estimado deve ser um inteiro (horas).
     Os campos impacto_financeiro, impacto_negocios, impacto_cliente, okr e estimado_qp devem ser 'Sim' ou 'Não'.
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    
     if _repository is None:
         return "Erro: Repositório não inicializado."
     
-    item = BacklogItem(
-        titulo=titulo,
-        descricao=descricao,
-        esforco_estimado=esforco_estimado,
-        area=area,
-        categoria=categoria,
-        impacto_financeiro=impacto_financeiro,
-        impacto_negocios=impacto_negocios,
-        impacto_cliente=impacto_cliente,
-        okr=okr,
-        estimado_qp=estimado_qp
-    )
-    _repository.add_item(item)
-    return f"Item '{titulo}' adicionado com sucesso ao backlog (ID: {item.id})."
+    try:
+        item = BacklogItem(
+            titulo=titulo,
+            descricao=descricao,
+            esforco_estimado=esforco_estimado,
+            area=area,
+            categoria=categoria,
+            impacto_financeiro=impacto_financeiro,
+            impacto_negocios=impacto_negocios,
+            impacto_cliente=impacto_cliente,
+            okr=okr,
+            estimado_qp=estimado_qp
+        )
+        
+        logger.info(f"Tentando adicionar item: {titulo} (área: {area}, esforço: {esforco_estimado}h)")
+        _repository.add_item(item)
+        logger.info(f"Item '{titulo}' adicionado com sucesso (ID: {item.id})")
+        return f"Item '{titulo}' adicionado com sucesso ao backlog (ID: {item.id})."
+        
+    except Exception as e:
+        error_msg = f"Erro ao adicionar item '{titulo}': {str(e)}"
+        logger.error(f"{error_msg}\n{traceback.format_exc()}")
+        return f"❌ {error_msg}. Por favor, verifique os logs para mais detalhes."
+
+@tool
+def find_backlog_item_by_title(titulo_busca: str) -> str:
+    """Busca itens do backlog por título (busca aproximada).
+    
+    Use esta ferramenta quando o usuário quiser atualizar/editar um item mas não souber o ID.
+    A ferramenta busca por títulos que contenham o texto fornecido (case-insensitive).
+    
+    IMPORTANTE: Após encontrar o(s) item(ns), você DEVE:
+    1. Mostrar os resultados ao usuário
+    2. Pedir confirmação de qual item ele quer atualizar
+    3. Usar o ID confirmado para chamar update_backlog_item
+    
+    Args:
+        titulo_busca: Texto para buscar no título (pode ser parte do título)
+    
+    Returns:
+        Lista de itens encontrados com ID, título e outras informações
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    if _repository is None:
+        return "Erro: Repositório não inicializado."
+    
+    try:
+        logger.info(f"Buscando itens com título contendo: '{titulo_busca}'")
+        items = _repository.list_items()
+        
+        if not items:
+            return "O backlog está vazio."
+        
+        # Busca case-insensitive
+        titulo_lower = titulo_busca.lower()
+        matches = [item for item in items if titulo_lower in item.titulo.lower()]
+        
+        if not matches:
+            return f"❌ Nenhum item encontrado com título contendo '{titulo_busca}'.\n\nTente usar palavras-chave diferentes ou liste todos os itens."
+        
+        if len(matches) == 1:
+            item = matches[0]
+            return f"""✅ **Encontrei 1 item:**
+
+📋 **Título:** {item.titulo}
+🆔 **ID:** `{item.id}`
+⏱️ **Esforço:** {item.esforco_estimado}h
+📂 **Área:** {item.area}
+📊 **Status:** {item.status}
+
+**Este é o item que você quer atualizar?** Se sim, me diga quais campos você quer alterar."""
+        
+        # Múltiplos resultados
+        result = f"✅ **Encontrei {len(matches)} itens:**\n\n"
+        for i, item in enumerate(matches, 1):
+            result += f"""**{i}. {item.titulo}**
+   🆔 ID: `{item.id}`
+   ⏱️ Esforço: {item.esforco_estimado}h | 📂 Área: {item.area} | 📊 Status: {item.status}
+
+"""
+        
+        result += "**Qual desses itens você quer atualizar?** Me diga o número ou o título completo."
+        return result
+        
+    except Exception as e:
+        error_msg = f"Erro ao buscar item: {str(e)}"
+        logger.error(f"{error_msg}\n{traceback.format_exc()}")
+        return f"❌ {error_msg}"
+
+@tool
+def update_backlog_item(
+    item_id: str,
+    titulo: Optional[str] = None,
+    descricao: Optional[str] = None,
+    esforco_estimado: Optional[int] = None,
+    area: Optional[str] = None,
+    categoria: Optional[str] = None,
+    impacto_financeiro: Optional[str] = None,
+    impacto_negocios: Optional[str] = None,
+    impacto_cliente: Optional[str] = None,
+    okr: Optional[str] = None,
+    must_have: Optional[str] = None,
+    estimado_qp: Optional[str] = None
+) -> str:
+    """Atualiza um item existente do backlog.
+    
+    Use esta ferramenta quando o usuário pedir para:
+    - "atualizar item"
+    - "editar item"
+    - "alterar item"
+    - "modificar item"
+    
+    Args:
+        item_id: ID do item a ser atualizado (obrigatório)
+        titulo: Novo título (opcional)
+        descricao: Nova descrição (opcional)
+        esforco_estimado: Novo esforço em horas (opcional)
+        area: Nova área (opcional)
+        categoria: Nova categoria (opcional)
+        impacto_financeiro: 'Sim' ou 'Não' (opcional)
+        impacto_negocios: 'Sim' ou 'Não' (opcional)
+        impacto_cliente: 'Sim' ou 'Não' (opcional)
+        okr: 'Sim' ou 'Não' (opcional)
+        must_have: 'Sim' ou 'Não' (opcional)
+        estimado_qp: 'Sim' ou 'Não' (opcional)
+    
+    Returns:
+        Mensagem de sucesso ou erro
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    if _repository is None:
+        return "Erro: Repositório não inicializado."
+    
+    try:
+        # Buscar item existente
+        logger.info(f"Buscando item com ID: {item_id}")
+        items = _repository.list_items()
+        item = next((i for i in items if i.id == item_id), None)
+        
+        if not item:
+            logger.warning(f"Item não encontrado: {item_id}")
+            return f"❌ Item com ID '{item_id}' não foi encontrado no backlog."
+        
+        # Guardar valores originais para logging
+        original_values = {}
+        updated_fields = []
+        
+        # Atualizar apenas os campos fornecidos (não None)
+        if titulo is not None:
+            original_values['titulo'] = item.titulo
+            item.titulo = titulo
+            updated_fields.append(f"título: '{original_values['titulo']}' → '{titulo}'")
+        
+        if descricao is not None:
+            original_values['descricao'] = item.descricao[:50] + "..." if len(item.descricao) > 50 else item.descricao
+            item.descricao = descricao
+            updated_fields.append("descrição")
+        
+        if esforco_estimado is not None:
+            original_values['esforco_estimado'] = item.esforco_estimado
+            item.esforco_estimado = esforco_estimado
+            updated_fields.append(f"esforço: {original_values['esforco_estimado']}h → {esforco_estimado}h")
+        
+        if area is not None:
+            original_values['area'] = item.area
+            item.area = area
+            updated_fields.append(f"área: '{original_values['area']}' → '{area}'")
+        
+        if categoria is not None:
+            original_values['categoria'] = item.categoria
+            item.categoria = categoria
+            updated_fields.append(f"categoria: '{original_values['categoria']}' → '{categoria}'")
+        
+        if impacto_financeiro is not None:
+            original_values['impacto_financeiro'] = item.impacto_financeiro
+            item.impacto_financeiro = impacto_financeiro
+            updated_fields.append(f"impacto financeiro: {original_values['impacto_financeiro']} → {impacto_financeiro}")
+        
+        if impacto_negocios is not None:
+            original_values['impacto_negocios'] = item.impacto_negocios
+            item.impacto_negocios = impacto_negocios
+            updated_fields.append(f"impacto negócios: {original_values['impacto_negocios']} → {impacto_negocios}")
+        
+        if impacto_cliente is not None:
+            original_values['impacto_cliente'] = item.impacto_cliente
+            item.impacto_cliente = impacto_cliente
+            updated_fields.append(f"impacto cliente: {original_values['impacto_cliente']} → {impacto_cliente}")
+        
+        if okr is not None:
+            original_values['okr'] = item.okr
+            item.okr = okr
+            updated_fields.append(f"OKR: {original_values['okr']} → {okr}")
+        
+        if must_have is not None:
+            original_values['must_have'] = item.must_have
+            item.must_have = must_have
+            updated_fields.append(f"must have: {original_values['must_have']} → {must_have}")
+        
+        if estimado_qp is not None:
+            original_values['estimado_qp'] = item.estimado_qp
+            item.estimado_qp = estimado_qp
+            updated_fields.append(f"estimado QP: {original_values['estimado_qp']} → {estimado_qp}")
+        
+        if not updated_fields:
+            return "⚠️ Nenhum campo foi especificado para atualização. Por favor, forneça pelo menos um campo para atualizar."
+        
+        # Atualizar no repositório
+        logger.info(f"Atualizando item '{item.titulo}' (ID: {item_id}). Campos alterados: {', '.join(updated_fields)}")
+        _repository.update_item(item)
+        logger.info(f"Item '{item.titulo}' atualizado com sucesso")
+        
+        # Mensagem de sucesso detalhada
+        changes_summary = "\n".join([f"  • {field}" for field in updated_fields])
+        return f"""✅ Item '{item.titulo}' atualizado com sucesso!
+
+📝 **Alterações realizadas:**
+{changes_summary}"""
+        
+    except Exception as e:
+        error_msg = f"Erro ao atualizar item '{item_id}': {str(e)}"
+        logger.error(f"{error_msg}\n{traceback.format_exc()}")
+        return f"❌ {error_msg}. Por favor, verifique os logs para mais detalhes."
 
 @tool
 def list_backlog_items() -> str:

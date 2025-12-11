@@ -91,8 +91,8 @@ if ($LASTEXITCODE -eq 0) {
     Write-Host "Function exists. Updating code..."
     aws lambda update-function-code --function-name $LAMBDA_FUNC_NAME --image-uri $FULL_IMAGE_URI --region $AWS_REGION
     
-    Write-Host "Updating configuration (Timeout=300s, Memory=1024MB, ModelID, Guardrails)..."
-    aws lambda update-function-configuration --function-name $LAMBDA_FUNC_NAME --timeout 300 --memory-size 1024 --environment "Variables={BEDROCK_MODEL_ID=us.anthropic.claude-sonnet-4-5-20250929-v1:0,BEDROCK_GUARDRAIL_ID=fwfavybfrb90,BEDROCK_GUARDRAIL_VERSION=DRAFT,DATABASE_TYPE=dynamodb,DYNAMODB_TABLE_SETTINGS=backlog_settings,DYNAMODB_TABLE_CONVERSATIONS=backlog_conversations,LLM_PROVIDER=bedrock,DYNAMODB_TABLE_ITEMS=backlog_items,RESULTADO_SHEET_NAME=Roadmap}" --region $AWS_REGION
+    Write-Host "Updating configuration (Timeout=300s, Memory=1024MB, ModelID)..."
+    aws lambda update-function-configuration --function-name $LAMBDA_FUNC_NAME --timeout 300 --memory-size 1024 --environment "Variables={BEDROCK_MODEL_ID=us.anthropic.claude-sonnet-4-5-20250929-v1:0,DATABASE_TYPE=dynamodb,DYNAMODB_TABLE_SETTINGS=backlog_settings,DYNAMODB_TABLE_CONVERSATIONS=backlog_conversations,LLM_PROVIDER=bedrock,DYNAMODB_TABLE_ITEMS=backlog_items,RESULTADO_SHEET_NAME=Roadmap}" --region $AWS_REGION
 
     # Wait for update
     Write-Host "Waiting for update to complete..."

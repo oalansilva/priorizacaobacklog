@@ -104,20 +104,25 @@ function ChatInterface({ messages, setMessages, conversationId, setConversationI
                 )}
             </div>
             <div className="p-4 border-t bg-gray-50 shrink-0">
-                <div className="flex gap-2">
-                    <input
-                        type="text"
-                        className="flex-1 border rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                        placeholder="Digite sua mensagem..."
+                <div className="flex gap-2 items-end">
+                    <textarea
+                        className="flex-1 border rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                        placeholder="Digite sua mensagem... (Ctrl+Enter para enviar)"
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter' && e.ctrlKey) {
+                                e.preventDefault();
+                                sendMessage();
+                            }
+                        }}
                         disabled={loading}
+                        rows={4}
                     />
                     <button
                         onClick={sendMessage}
                         disabled={loading}
-                        className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                        className="bg-indigo-600 text-white px-6 py-3 rounded-lg hover:bg-indigo-700 disabled:opacity-50 h-fit"
                     >
                         Enviar
                     </button>
