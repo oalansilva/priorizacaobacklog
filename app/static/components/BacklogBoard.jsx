@@ -6,6 +6,9 @@ function BacklogBoard() {
     const [editingItem, setEditingItem] = useState(null);
     const [viewingJustification, setViewingJustification] = useState(null);
     const [prioritizationStatus, setPrioritizationStatus] = useState(null);
+    const [showRoadmaps, setShowRoadmaps] = useState(false);
+    const [roadmaps, setRoadmaps] = useState([]);
+    const [loadingRoadmaps, setLoadingRoadmaps] = useState(false);
 
     const fetchItems = async () => {
         try {
@@ -52,6 +55,99 @@ function BacklogBoard() {
             console.error("Erro ao deletar item:", error);
             alert("Erro ao deletar item. Verifique o console.");
         }
+    };
+
+    const fetchRoadmaps = async () => {
+        try {
+            setLoadingRoadmaps(true);
+            const response = await axios.get('roadmaps/');
+            setRoadmaps(response.data);
+            setShowRoadmaps(true);
+        } catch (error) {
+            console.error("Erro ao buscar roadmaps:", error);
+            alert("Erro ao carregar roadmaps");
+        } finally {
+            setLoadingRoadmaps(false);
+        }
+    };
+
+    const exportRoadmap = (roadmapId) => {
+        window.location.href = `roadmaps/${roadmapId}/export`;
+    };
+
+    const exportPdf = async (roadmapId) => {
+        try {
+            const response = await axios.get(`roadmaps/${roadmapId}/export-pdf`, {
+                responseType: 'blob',
+                headers: {
+                    'Accept': 'application/pdf'
+                }
+            });
+
+            let blob = response.data;
+            try {
+                const text = await blob.text();
+                if (text.startsWith('JVBERi')) {
+                    console.log("Detectado PDF em Base64, decodificando...");
+                    const binaryString = atob(text);
+                    const bytes = new Uint8Array(binaryString.length);
+                    for (let i = 0; i < binaryString.length; i++) {
+                        bytes[i] = binaryString.charCodeAt(i);
+                    }
+                    blob = new Blob([bytes], { type: 'application/pdf' });
+                }
+            } catch (e) {
+                console.log("Blob não é texto ou erro ao verificar Base64:", e);
+            }
+
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+
+            // Extract filename
+            let filename = `roadmap_${new Date().toISOString().slice(0, 10)}.pdf`;
+            const contentDisposition = response.headers['content-disposition'];
+            if (contentDisposition) {
+                const fileNameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
+                if (fileNameMatch && fileNameMatch.length === 2)
+                    filename = fileNameMatch[1];
+            }
+
+            link.setAttribute('download', filename);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error('Erro ao exportar PDF:', error);
+            // Tentar ler a mensagem de erro do blob
+            if (error.response && error.response.data instanceof Blob) {
+                const reader = new FileReader();
+                reader.onload = () => {
+                    try {
+                        const errorObj = JSON.parse(reader.result);
+                        alert(`Erro: ${errorObj.detail || 'Falha na exportação'}`);
+                    } catch (e) {
+                        alert('Erro ao gerar PDF. Verifique se o roadmap ainda existe.');
+                    }
+                };
+                reader.readAsText(error.response.data);
+            } else {
+                alert('Erro ao solicitar PDF.');
+            }
+        }
+    };
+
+    const formatDate = (isoDate) => {
+        const date = new Date(isoDate);
+        return date.toLocaleString('pt-BR', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            timeZone: 'America/Sao_Paulo'
+        });
     };
 
     useEffect(() => {
@@ -130,10 +226,94 @@ function BacklogBoard() {
                 </div>
             )}
 
+            {/* Roadmaps Modal */}
+            {showRoadmaps && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+                        <div className="p-4 border-b border-gray-200 flex justify-between items-center">
+                            <h3 className="text-lg font-bold text-gray-900">📊 Histórico de Roadmaps</h3>
+                            <button
+                                onClick={() => setShowRoadmaps(false)}
+                                className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
+                            >
+                                ×
+                            </button>
+                        </div>
+                        <div className="p-4 overflow-y-auto flex-1">
+                            {roadmaps.length === 0 ? (
+                                <div className="text-center text-gray-500 py-8">
+                                    Nenhum roadmap encontrado. Execute uma priorização para gerar o primeiro roadmap.
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {roadmaps.map((roadmap) => (
+                                        <div key={roadmap.id} className="bg-white border border-gray-200 rounded-lg shadow hover:shadow-md transition-shadow p-4">
+                                            <div className="mb-3">
+                                                <span className="text-sm text-gray-500">
+                                                    📅 {formatDate(roadmap.created_at)}
+                                                </span>
+                                            </div>
+
+                                            <div className="space-y-2 mb-4">
+                                                <div className="flex justify-between text-sm">
+                                                    <span className="text-gray-600">Total de Itens</span>
+                                                    <span className="font-semibold">{roadmap.total_itens}</span>
+                                                </div>
+                                                <div className="flex justify-between text-sm">
+                                                    <span className="text-gray-600">Priorizados</span>
+                                                    <span className="font-semibold text-green-600">{roadmap.itens_priorizados}</span>
+                                                </div>
+                                                <div className="flex justify-between text-sm">
+                                                    <span className="text-gray-600">Despriorizados</span>
+                                                    <span className="font-semibold text-red-600">{roadmap.itens_despriorizados}</span>
+                                                </div>
+                                                <div className="flex justify-between text-sm">
+                                                    <span className="text-gray-600">Horas Alocadas</span>
+                                                    <span className="font-semibold">{roadmap.horas_alocadas}h</span>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex gap-2">
+                                                <button
+                                                    onClick={() => exportRoadmap(roadmap.id)}
+                                                    className="flex-1 px-3 py-2 bg-green-600 text-white text-sm rounded hover:bg-green-700 transition-colors"
+                                                >
+                                                    📥 CSV
+                                                </button>
+                                                <button
+                                                    onClick={() => exportPdf(roadmap.id)}
+                                                    className="flex-1 px-3 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
+                                                >
+                                                    📄 PDF
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div className="sticky top-0 bg-gray-50 z-10 pb-2 sm:pb-3">
                 <div className="flex justify-between items-center mb-2 sm:mb-3">
                     <h2 className="text-lg sm:text-xl font-bold text-gray-800">Backlog de Demandas</h2>
-                    <button onClick={fetchItems} className="text-indigo-600 hover:text-indigo-800 text-xs sm:text-sm font-medium">Atualizar</button>
+                    <div className="flex gap-2">
+                        <button
+                            onClick={fetchRoadmaps}
+                            className="px-3 py-1.5 bg-indigo-600 text-white text-xs sm:text-sm font-medium rounded hover:bg-indigo-700 transition-colors"
+                            disabled={loadingRoadmaps}
+                        >
+                            {loadingRoadmaps ? '...' : '📊 Roadmaps'}
+                        </button>
+                        <button
+                            onClick={fetchItems}
+                            className="text-indigo-600 hover:text-indigo-800 text-xs sm:text-sm font-medium"
+                        >
+                            Atualizar
+                        </button>
+                    </div>
                 </div>
 
                 {/* Summary Statistics */}

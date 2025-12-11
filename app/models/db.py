@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List
 from pydantic import BaseModel, Field
 import uuid
@@ -52,3 +52,47 @@ class SystemSettings(BaseModel):
     last_prioritization_message: Optional[str] = None
     last_prioritization_time: Optional[str] = None
 
+
+class RoadmapItem(BaseModel):
+    """Snapshot de um item no momento da priorização."""
+    id: str
+    titulo: str
+    descricao: str
+    esforco_estimado: int
+    area: str
+    status: str  # Priorizado ou Despriorizado
+    prioridade: int
+    score: float
+    categoria: Optional[str] = None
+    impacto_financeiro: str = "Não"
+    impacto_negocios: str = "Não"
+    impacto_cliente: str = "Não"
+    okr: str = "Não"
+    must_have: str = "Não"
+    justificativa: Optional[str] = None
+
+
+class Roadmap(BaseModel):
+    """Histórico de uma priorização executada."""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    
+    # Configuração usada
+    capacidade_total: int
+    percentual_sustentacao: int
+    capacidade_iniciativas: int
+    
+    # Métricas
+    total_itens: int
+    itens_priorizados: int
+    itens_despriorizados: int
+    horas_alocadas: int
+    
+    # Snapshot dos itens
+    itens: List[RoadmapItem]
+    
+    # Pesos usados na priorização
+    peso_financeiro: int
+    peso_negocios: int
+    peso_cliente: int
+    peso_okr: int

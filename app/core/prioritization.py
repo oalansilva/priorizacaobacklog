@@ -323,17 +323,69 @@ class PrioritizationService:
                     message="LLM despriorizou itens Must Have - revisar justificativas"
                 )
         
-        # Validação: avisar se total de horas priorizadas excede capacidade
+        
+        # VALIDAÇÃO FORÇADA: Garantir que capacidade seja respeitada
         mask_priorizado = df["status"] == "Priorizado"
         total_horas_priorizadas = df.loc[mask_priorizado, "horas"].sum()
+        
         if total_horas_priorizadas > capacidade_iniciativas:
             self.logger.warning(
-                "capacity_exceeded",
+                "capacity_exceeded_forcing_correction",
                 total_horas=total_horas_priorizadas,
                 capacidade=capacidade_iniciativas,
                 excesso=total_horas_priorizadas - capacidade_iniciativas,
-                message=f"Total de horas priorizadas ({total_horas_priorizadas}h) excede capacidade ({capacidade_iniciativas}h)"
+                message=f"LLM excedeu capacidade. Corrigindo automaticamente..."
             )
+            
+            # Separar Must Have dos demais
+            mask_must_have = df.get("must_have", pd.Series(["Não"] * len(df))).str.lower() == "sim"
+            
+            # Priorizar Must Have primeiro
+            df_must_have = df[mask_priorizado & mask_must_have].copy()
+            df_outros = df[mask_priorizado & ~mask_must_have].copy()
+            
+            # Calcular capacidade usada por Must Have
+            horas_must_have = df_must_have["horas"].sum()
+            capacidade_restante = capacidade_iniciativas - horas_must_have
+            
+            # Se Must Have já excede capacidade, avisar mas manter
+            if horas_must_have > capacidade_iniciativas:
+                self.logger.error(
+                    "must_have_exceeds_capacity",
+                    horas_must_have=horas_must_have,
+                    capacidade=capacidade_iniciativas,
+                    message="Must Have items excedem capacidade total - mantendo todos"
+                )
+                capacidade_restante = 0
+            
+            # Alocar outros itens até preencher capacidade restante
+            horas_acumuladas = 0
+            indices_priorizados = []
+            indices_despriorizados = []
+            
+            for idx, row in df_outros.iterrows():
+                if horas_acumuladas + row["horas"] <= capacidade_restante:
+                    horas_acumuladas += row["horas"]
+                    indices_priorizados.append(idx)
+                else:
+                    indices_despriorizados.append(idx)
+            
+            # Atualizar status dos itens que excederam
+            if indices_despriorizados:
+                df.loc[indices_despriorizados, "status"] = "Despriorizado"
+                df.loc[indices_despriorizados, "justificativa"] = df.loc[indices_despriorizados, "justificativa"].apply(
+                    lambda x: f"{x} [Ajustado: Excedeu capacidade disponível]" if pd.notna(x) else "[Ajustado: Excedeu capacidade disponível]"
+                )
+                
+                self.logger.info(
+                    "capacity_correction_applied",
+                    items_despriorizados=len(indices_despriorizados),
+                    horas_liberadas=df.loc[indices_despriorizados, "horas"].sum(),
+                    nova_alocacao=horas_must_have + horas_acumuladas
+                )
+            
+            # Recalcular mask após correção
+            mask_priorizado = df["status"] == "Priorizado"
         
         # Ordenar: Priorizado primeiro, depois Must Have primeiro, depois ordem original
         df["_status_order"] = df["status"].map({"Priorizado": 0, "Despriorizado": 1})

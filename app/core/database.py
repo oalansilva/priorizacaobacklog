@@ -3,7 +3,7 @@ import sqlite3
 import json
 import os
 from typing import List, Optional
-from app.models.db import BacklogItem, Conversation, ConversationMessage, SystemSettings
+from app.models.db import BacklogItem, Conversation, ConversationMessage, SystemSettings, Roadmap, RoadmapItem
 
 class DatabaseRepository(abc.ABC):
     @abc.abstractmethod
@@ -40,6 +40,22 @@ class DatabaseRepository(abc.ABC):
 
     @abc.abstractmethod
     def update_settings(self, settings: SystemSettings) -> SystemSettings:
+        pass
+    
+    @abc.abstractmethod
+    def save_roadmap(self, roadmap: Roadmap) -> Roadmap:
+        pass
+    
+    @abc.abstractmethod
+    def list_roadmaps(self) -> List[Roadmap]:
+        pass
+    
+    @abc.abstractmethod
+    def get_roadmap(self, roadmap_id: str) -> Optional[Roadmap]:
+        pass
+    
+    @abc.abstractmethod
+    def delete_roadmap(self, roadmap_id: str) -> bool:
         pass
 
 class SQLiteRepository(DatabaseRepository):
@@ -126,6 +142,26 @@ class SQLiteRepository(DatabaseRepository):
                 INSERT OR IGNORE INTO settings (id, capacidade_total, percentual_sustentacao, 
                    peso_financeiro, peso_negocios, peso_cliente, peso_okr, updated_at) 
                    VALUES (1, 1000, 20, 25, 25, 25, 25, datetime('now'))
+            """)
+            
+            # Create roadmaps table
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS roadmaps (
+                    id TEXT PRIMARY KEY,
+                    created_at TEXT,
+                    capacidade_total INTEGER,
+                    percentual_sustentacao INTEGER,
+                    capacidade_iniciativas INTEGER,
+                    total_itens INTEGER,
+                    itens_priorizados INTEGER,
+                    itens_despriorizados INTEGER,
+                    horas_alocadas INTEGER,
+                    peso_financeiro INTEGER,
+                    peso_negocios INTEGER,
+                    peso_cliente INTEGER,
+                    peso_okr INTEGER,
+                    itens_json TEXT
+                )
             """)
 
     def add_item(self, item: BacklogItem) -> BacklogItem:
@@ -242,6 +278,88 @@ class SQLiteRepository(DatabaseRepository):
             )
         return settings
 
+    def save_roadmap(self, roadmap: Roadmap) -> Roadmap:
+        with sqlite3.connect(self.db_path) as conn:
+            # Serializar itens para JSON
+            itens_json = json.dumps([item.model_dump() for item in roadmap.itens])
+            
+            conn.execute(
+                """INSERT INTO roadmaps 
+                   (id, created_at, capacidade_total, percentual_sustentacao, capacidade_iniciativas,
+                    total_itens, itens_priorizados, itens_despriorizados, horas_alocadas,
+                    peso_financeiro, peso_negocios, peso_cliente, peso_okr, itens_json)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    roadmap.id, roadmap.created_at, roadmap.capacidade_total,
+                    roadmap.percentual_sustentacao, roadmap.capacidade_iniciativas,
+                    roadmap.total_itens, roadmap.itens_priorizados, roadmap.itens_despriorizados,
+                    roadmap.horas_alocadas, roadmap.peso_financeiro, roadmap.peso_negocios,
+                    roadmap.peso_cliente, roadmap.peso_okr, itens_json
+                )
+            )
+        return roadmap
+
+    def list_roadmaps(self) -> List[Roadmap]:
+        roadmaps = []
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute(
+                "SELECT * FROM roadmaps ORDER BY created_at DESC"
+            )
+            for row in cursor:
+                itens_data = json.loads(row[13])  # itens_json é a coluna 13
+                itens = [RoadmapItem(**item) for item in itens_data]
+                
+                roadmaps.append(Roadmap(
+                    id=row[0],
+                    created_at=row[1],
+                    capacidade_total=row[2],
+                    percentual_sustentacao=row[3],
+                    capacidade_iniciativas=row[4],
+                    total_itens=row[5],
+                    itens_priorizados=row[6],
+                    itens_despriorizados=row[7],
+                    horas_alocadas=row[8],
+                    peso_financeiro=row[9],
+                    peso_negocios=row[10],
+                    peso_cliente=row[11],
+                    peso_okr=row[12],
+                    itens=itens
+                ))
+        return roadmaps
+
+    def get_roadmap(self, roadmap_id: str) -> Optional[Roadmap]:
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute(
+                "SELECT * FROM roadmaps WHERE id = ?", (roadmap_id,)
+            )
+            row = cursor.fetchone()
+            if row:
+                itens_data = json.loads(row[13])
+                itens = [RoadmapItem(**item) for item in itens_data]
+                
+                return Roadmap(
+                    id=row[0],
+                    created_at=row[1],
+                    capacidade_total=row[2],
+                    percentual_sustentacao=row[3],
+                    capacidade_iniciativas=row[4],
+                    total_itens=row[5],
+                    itens_priorizados=row[6],
+                    itens_despriorizados=row[7],
+                    horas_alocadas=row[8],
+                    peso_financeiro=row[9],
+                    peso_negocios=row[10],
+                    peso_cliente=row[11],
+                    peso_okr=row[12],
+                    itens=itens
+                )
+        return None
+
+    def delete_roadmap(self, roadmap_id: str) -> bool:
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute("DELETE FROM roadmaps WHERE id = ?", (roadmap_id,))
+            return cursor.rowcount > 0
+
 
 class DynamoDBRepository(DatabaseRepository):
     def __init__(self):
@@ -253,6 +371,7 @@ class DynamoDBRepository(DatabaseRepository):
         self.table_items = self.dynamodb.Table(self.settings.dynamodb_table_items)
         self.table_conversations = self.dynamodb.Table(self.settings.dynamodb_table_conversations)
         self.table_settings = self.dynamodb.Table(self.settings.dynamodb_table_settings)
+        self.table_roadmaps = self.dynamodb.Table(self.settings.dynamodb_table_roadmaps)
 
     def _convert_floats_to_decimals(self, obj):
         from decimal import Decimal
@@ -343,6 +462,38 @@ class DynamoDBRepository(DatabaseRepository):
         data = self._convert_floats_to_decimals(data)
         self.table_settings.put_item(Item=data)
         return settings
+    
+    def save_roadmap(self, roadmap: Roadmap) -> Roadmap:
+        data = roadmap.model_dump()
+        data = self._convert_floats_to_decimals(data)
+        self.table_roadmaps.put_item(Item=data)
+        return roadmap
+    
+    def list_roadmaps(self) -> List[Roadmap]:
+        response = self.table_roadmaps.scan()
+        roadmaps_data = response.get('Items', [])
+        
+        while 'LastEvaluatedKey' in response:
+            response = self.table_roadmaps.scan(ExclusiveStartKey=response['LastEvaluatedKey'])
+            roadmaps_data.extend(response.get('Items', []))
+        
+        roadmaps = [Roadmap(**roadmap) for roadmap in roadmaps_data]
+        roadmaps.sort(key=lambda x: x.created_at, reverse=True)
+        return roadmaps
+    
+    def get_roadmap(self, roadmap_id: str) -> Optional[Roadmap]:
+        response = self.table_roadmaps.get_item(Key={'id': roadmap_id})
+        item = response.get('Item')
+        if item:
+            return Roadmap(**item)
+        return None
+    
+    def delete_roadmap(self, roadmap_id: str) -> bool:
+        try:
+            self.table_roadmaps.delete_item(Key={'id': roadmap_id})
+            return True
+        except Exception:
+            return False
 
 
 def get_repository() -> DatabaseRepository:

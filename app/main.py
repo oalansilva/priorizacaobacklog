@@ -31,7 +31,7 @@ from app.core.prioritization import PrioritizationService
 from app.logging import get_logger
 from app.models import PrioritizationRequest, PrioritizationResponse
 from app.security import enforce_api_key
-from app.api import chat, items, settings
+from app.api import chat, items, settings, roadmaps
 
 logger = get_logger(__name__)
 
@@ -53,6 +53,7 @@ app = FastAPI(
 app.include_router(chat.router)
 app.include_router(items.router)
 app.include_router(settings.router)
+app.include_router(roadmaps.router)
 
 # Configure CORS
 app.add_middleware(
@@ -265,6 +266,71 @@ def execute_prioritization(
         not_found_count=not_found_count,
         total_items=len(result.itens)
     )
+    
+    
+    # Salvar roadmap no histórico
+    try:
+        import traceback
+        from app.models.db import Roadmap, RoadmapItem
+        
+        logger.info("starting_roadmap_save", total_items=len(items))
+        
+        # Obter configurações atualizadas para pesos
+        current_settings = repo.get_settings()
+        logger.info("settings_retrieved", 
+                   peso_financeiro=current_settings.peso_financeiro,
+                   peso_negocios=current_settings.peso_negocios)
+        
+        # Criar snapshot dos itens
+        roadmap_items = []
+        for item in items:
+            roadmap_items.append(RoadmapItem(
+                id=item.id,
+                titulo=item.titulo,
+                descricao=item.descricao,
+                esforco_estimado=item.esforco_estimado,
+                area=item.area,
+                status=item.status,
+                prioridade=item.prioridade,
+                score=item.score,
+                categoria=item.categoria,
+                impacto_financeiro=item.impacto_financeiro,
+                impacto_negocios=item.impacto_negocios,
+                impacto_cliente=item.impacto_cliente,
+                okr=item.okr,
+                must_have=item.must_have,
+                justificativa=item.justificativa
+            ))
+        
+        logger.info("roadmap_items_created", count=len(roadmap_items))
+        
+        # Criar roadmap
+        roadmap = Roadmap(
+            capacidade_total=capacidade_total,
+            percentual_sustentacao=percentual_sustentacao,
+            capacidade_iniciativas=result.capacidade_iniciativas,
+            total_itens=len(items),
+            itens_priorizados=len([i for i in items if i.status == "Priorizado"]),
+            itens_despriorizados=len([i for i in items if i.status == "Despriorizado"]),
+            horas_alocadas=result.horas_alocadas,
+            itens=roadmap_items,
+            peso_financeiro=current_settings.peso_financeiro,
+            peso_negocios=current_settings.peso_negocios,
+            peso_cliente=current_settings.peso_cliente,
+            peso_okr=current_settings.peso_okr
+        )
+        
+        logger.info("roadmap_object_created", roadmap_id=roadmap.id)
+        
+        repo.save_roadmap(roadmap)
+        logger.info("roadmap_saved_successfully", roadmap_id=roadmap.id, total_items=len(roadmap_items))
+        
+    except Exception as e:
+        logger.error("failed_to_save_roadmap", 
+                    error=str(e), 
+                    error_type=type(e).__name__,
+                    traceback=traceback.format_exc())
+        # Não falhar a priorização se o salvamento do roadmap falhar
     
     return result
 

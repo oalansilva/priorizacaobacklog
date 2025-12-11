@@ -34,6 +34,12 @@ function App() {
                         Backlog
                     </button>
                     <button
+                        onClick={() => setActiveTab('roadmaps')}
+                        className={`px-2 sm:px-3 py-1 rounded text-sm sm:text-base ${activeTab === 'roadmaps' ? 'bg-indigo-800' : 'hover:bg-indigo-700'}`}
+                    >
+                        Roadmaps
+                    </button>
+                    <button
                         onClick={() => setActiveTab('setup')}
                         className={`px-2 sm:px-3 py-1 rounded text-sm sm:text-base ${activeTab === 'setup' ? 'bg-indigo-800' : 'hover:bg-indigo-700'}`}
                     >
@@ -53,6 +59,7 @@ function App() {
                         />
                     )}
                     {activeTab === 'backlog' && <BacklogBoard />}
+                    {activeTab === 'roadmaps' && <RoadmapHistory />}
                     {activeTab === 'setup' && <SetupPanel />}
                 </div>
 
