@@ -2,6 +2,7 @@ function RoadmapHistory() {
     const [roadmaps, setRoadmaps] = React.useState([]);
     const [loading, setLoading] = React.useState(true);
     const [selectedRoadmap, setSelectedRoadmap] = React.useState(null);
+    const [viewingJustification, setViewingJustification] = React.useState(null);
 
     React.useEffect(() => {
         fetchRoadmaps();
@@ -147,12 +148,53 @@ function RoadmapHistory() {
         );
     }
 
+    // Modal de Justificativa
+    const JustificationModal = () => {
+        if (!viewingJustification) return null;
+
+        return (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+                <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+                    <div className="p-4 border-b border-gray-200 flex justify-between items-start">
+                        <div>
+                            <h3 className="text-lg font-bold text-gray-900">{viewingJustification.titulo}</h3>
+                            <span className={`inline-block mt-1 px-2 py-0.5 rounded text-xs font-semibold ${viewingJustification.status === 'Priorizado' ? 'bg-green-100 text-green-800' :
+                                viewingJustification.status === 'Despriorizado' ? 'bg-red-100 text-red-800' :
+                                    'bg-blue-100 text-blue-800'
+                                }`}>
+                                {viewingJustification.status}
+                            </span>
+                        </div>
+                        <button
+                            onClick={() => setViewingJustification(null)}
+                            className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
+                        >
+                            ×
+                        </button>
+                    </div>
+                    <div className="p-4">
+                        <h4 className="font-semibold text-gray-700 mb-2">Justificativa Histórica:</h4>
+                        <div className="bg-gray-50 p-3 rounded border border-gray-100">
+                            <p className="text-gray-600 whitespace-pre-wrap">
+                                {viewingJustification.justificativa || 'Nenhuma justificativa registrada para este item neste roadmap.'}
+                            </p>
+                        </div>
+                        <p className="text-xs text-gray-400 mt-2">
+                            * Esta justificativa reflete o momento em que o roadmap foi gerado.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
     if (selectedRoadmap) {
         const priorizados = selectedRoadmap.itens.filter(i => i.status === 'Priorizado').sort((a, b) => a.prioridade - b.prioridade);
         const despriorizados = selectedRoadmap.itens.filter(i => i.status === 'Despriorizado').sort((a, b) => a.prioridade - b.prioridade);
 
         return (
-            <div className="p-6">
+            <div className="p-6 relative">
+                <JustificationModal />
                 <div className="mb-4 flex justify-between items-center">
                     <h2 className="text-2xl font-bold">Detalhes do Roadmap</h2>
                     <button
@@ -201,7 +243,18 @@ function RoadmapHistory() {
                                             </span>
                                             <span className="font-semibold">{item.titulo}</span>
                                         </div>
-                                        <span className="text-sm text-gray-600">{item.esforco_estimado}h</span>
+                                        <div className="flex items-center gap-2">
+                                            {item.justificativa && (
+                                                <button
+                                                    onClick={() => setViewingJustification(item)}
+                                                    className="text-gray-400 hover:text-blue-600 p-1 rounded hover:bg-blue-50 transition-colors"
+                                                    title="Ver Justificativa"
+                                                >
+                                                    💬
+                                                </button>
+                                            )}
+                                            <span className="text-sm text-gray-600">{item.esforco_estimado}h</span>
+                                        </div>
                                     </div>
                                     <p className="text-sm text-gray-600 mt-1">{item.area}</p>
                                     <p className="text-sm text-gray-500 mt-1">Score: {item.score.toFixed(1)}%</p>
@@ -225,7 +278,18 @@ function RoadmapHistory() {
                                             </span>
                                             <span className="font-semibold">{item.titulo}</span>
                                         </div>
-                                        <span className="text-sm text-gray-600">{item.esforco_estimado}h</span>
+                                        <div className="flex items-center gap-2">
+                                            {item.justificativa && (
+                                                <button
+                                                    onClick={() => setViewingJustification(item)}
+                                                    className="text-gray-400 hover:text-blue-600 p-1 rounded hover:bg-blue-50 transition-colors"
+                                                    title="Ver Justificativa"
+                                                >
+                                                    💬
+                                                </button>
+                                            )}
+                                            <span className="text-sm text-gray-600">{item.esforco_estimado}h</span>
+                                        </div>
                                     </div>
                                     <p className="text-sm text-gray-600 mt-1">{item.area}</p>
                                     <p className="text-sm text-gray-500 mt-1">Score: {item.score.toFixed(1)}%</p>
