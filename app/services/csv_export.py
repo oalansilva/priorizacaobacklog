@@ -51,7 +51,7 @@ def export_roadmap_to_csv(roadmap: Roadmap) -> str:
     
     # === SEÇÃO PRIORIZADOS ===
     writer.writerow(['ITENS PRIORIZADOS'])
-    writer.writerow(['#', 'Título', 'Área', 'Esforço (h)', 'Score', 'Impacto Fin.', 'Impacto Neg.', 'Impacto Cli.', 'OKR', 'Must Have'])
+    writer.writerow(['#', 'Título', 'Área', 'Esforço (h)', 'Score', 'Impacto Fin.', 'Impacto Neg.', 'Impacto Cli.', 'OKR', 'Must Have', 'Justificativa'])
     
     priorizados = [item for item in roadmap.itens if item.status == "Priorizado"]
     priorizados.sort(key=lambda x: x.prioridade if x.prioridade else 999)
@@ -68,7 +68,8 @@ def export_roadmap_to_csv(roadmap: Roadmap) -> str:
             item.impacto_negocios or 'Não',
             item.impacto_cliente or 'Não',
             item.okr or 'Não',
-            item.must_have or 'Não'
+            item.must_have or 'Não',
+            item.justificativa or ''
         ])
     
     writer.writerow([])
@@ -76,7 +77,7 @@ def export_roadmap_to_csv(roadmap: Roadmap) -> str:
     
     # === SEÇÃO DESPRIORIZADOS ===
     writer.writerow(['ITENS DESPRIORIZADOS'])
-    writer.writerow(['#', 'Título', 'Área', 'Esforço (h)', 'Score', 'Impacto Fin.', 'Impacto Neg.', 'Impacto Cli.', 'OKR', 'Must Have'])
+    writer.writerow(['#', 'Título', 'Área', 'Esforço (h)', 'Score', 'Impacto Fin.', 'Impacto Neg.', 'Impacto Cli.', 'OKR', 'Must Have', 'Justificativa'])
     
     despriorizados = [item for item in roadmap.itens if item.status == "Despriorizado"]
     despriorizados.sort(key=lambda x: x.prioridade if x.prioridade else 999)
@@ -93,7 +94,8 @@ def export_roadmap_to_csv(roadmap: Roadmap) -> str:
             item.impacto_negocios or 'Não',
             item.impacto_cliente or 'Não',
             item.okr or 'Não',
-            item.must_have or 'Não'
+            item.must_have or 'Não',
+            item.justificativa or ''
         ])
     
     csv_content = output.getvalue()
