@@ -14,11 +14,13 @@ def handle_async_prioritization(event):
     try:
         cap_total = event.get("capacidade_total")
         perc_sust = event.get("percentual_sustentacao")
+        user_id = event.get("user_id")  # Extract user_id from payload
         
         # Executar a lógica pesada
         result = execute_prioritization(
             capacidade_total=cap_total,
-            percentual_sustentacao=perc_sust
+            percentual_sustentacao=perc_sust,
+            user_id=user_id  # Pass user_id to create roadmap with correct ownership
         )
         
         # Atualizar status no DynamoDB

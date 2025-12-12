@@ -398,11 +398,15 @@ def prioritize_backlog(capacidade_total: Optional[int] = None, percentual_susten
             lambda_client = boto3.client('lambda')
             function_name = os.environ.get("AWS_LAMBDA_FUNCTION_NAME")
             
+            # Get current user_id from context
+            current_user_id = user_id_ctx.get()
+            
             payload = {
                 "type": "async_task",
                 "action": "prioritize",
                 "capacidade_total": cap_total,
-                "percentual_sustentacao": perc_sust
+                "percentual_sustentacao": perc_sust,
+                "user_id": current_user_id
             }
             
             lambda_client.invoke(
