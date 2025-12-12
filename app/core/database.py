@@ -517,10 +517,14 @@ class DynamoDBRepository(DatabaseRepository):
             return False
 
     def get_settings(self) -> SystemSettings:
-        response = self.table_settings.get_item(Key={'id': 1})
+        # Settings table has String key "1", but model uses int 1.
+        response = self.table_settings.get_item(Key={'id': str(1)})
         item = response.get('Item')
         if item:
             # DynamoDB stores numbers as Decimal, Pydantic handles conversion
+            # Ensure ID is passed as int to model if model expects int
+            if 'id' in item:
+                item['id'] = int(item['id'])
             return SystemSettings(**item)
         
         # If not found, create default
@@ -531,6 +535,8 @@ class DynamoDBRepository(DatabaseRepository):
     def update_settings(self, settings: SystemSettings) -> SystemSettings:
         data = settings.model_dump()
         data = self._convert_floats_to_decimals(data)
+        # Force ID to be string for DynamoDB
+        data['id'] = str(data['id'])
         self.table_settings.put_item(Item=data)
         return settings
     

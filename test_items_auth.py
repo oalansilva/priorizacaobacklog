@@ -35,7 +35,6 @@ def test_list_items(token):
             print(f"Redirect Location: {response.headers.get('Location')}")
             
         if response.status_code == 200:
-            items = response.json()
             print(f"Success! Found {len(items)} items:")
             print(json.dumps(items, indent=2))
         else:
@@ -44,8 +43,34 @@ def test_list_items(token):
     except Exception as e:
         print(f"Exception: {e}")
 
+def test_add_item(token):
+    url = f"{BASE_URL}/items" 
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "titulo": "Test Item from Script",
+        "descricao": "Description",
+        "esforco_estimado": 5,
+        "area": "Dev",
+        "status": "Novo"
+    }
+    print(f"Adding item...")
+    try:
+        response = requests.post(url, json=payload, headers=headers, allow_redirects=False)
+        print(f"Add Status: {response.status_code}")
+        if response.status_code == 200:
+            print("Item added:", response.json())
+        else:
+            print("Error adding:", response.text)
+    except Exception as e:
+        print(f"Exception adding: {e}")
+
 if __name__ == "__main__":
     print("Getting token...")
     token = get_token()
-    print("Token obtained. Testing list items...")
+    print("Token obtained.")
+    test_add_item(token)
+    print("Listing items...")
     test_list_items(token)
