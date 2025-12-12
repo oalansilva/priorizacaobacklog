@@ -23,10 +23,12 @@ function ChatInterface({ messages, setMessages, conversationId, setConversationI
         setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
 
         try {
+            const token = localStorage.getItem('access_token');
             const response = await fetch('chat/', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
                 },
                 body: JSON.stringify({
                     message: userMsg.content,
