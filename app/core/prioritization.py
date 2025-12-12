@@ -94,6 +94,7 @@ class PrioritizationService:
 
         itens = [
             PrioritizedItem(
+                id=str(row.get("id")) if pd.notna(row.get("id")) else None,
                 prioridade=int(row["prioridade"]),
                 item=str(row.get("item", "")),
                 horas=float(row.get("horas", 0)),

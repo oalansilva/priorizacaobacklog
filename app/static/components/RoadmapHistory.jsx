@@ -20,8 +20,58 @@ function RoadmapHistory() {
         }
     };
 
-    const exportRoadmap = (roadmapId) => {
-        window.location.href = `roadmaps/${roadmapId}/export`;
+    const exportRoadmap = async (roadmapId) => {
+        try {
+            console.log('Exportando CSV para roadmap:', roadmapId);
+            console.log('Token de autenticação:', axios.defaults.headers.common['Authorization'] ? 'Presente' : 'AUSENTE');
+
+            const response = await axios.get(`roadmaps/${roadmapId}/export`, {
+                responseType: 'blob'
+            });
+
+            console.log('CSV recebido com sucesso, tamanho:', response.data.size);
+
+            const url = window.URL.createObjectURL(response.data);
+            const link = document.createElement('a');
+            link.href = url;
+
+            // Extract filename from header if possible, default to timestamped name
+            let filename = `roadmap_${new Date().toISOString().slice(0, 10)}.csv`;
+            const contentDisposition = response.headers['content-disposition'];
+            if (contentDisposition) {
+                const fileNameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
+                if (fileNameMatch && fileNameMatch.length === 2)
+                    filename = fileNameMatch[1];
+            }
+
+            link.setAttribute('download', filename);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(url);
+
+            console.log('Download do CSV iniciado:', filename);
+        } catch (error) {
+            console.error('Erro ao exportar CSV:', error);
+            console.error('Detalhes do erro:', error.response?.data, error.response?.status);
+
+            // Tentar ler a mensagem de erro do blob (se possível)
+            if (error.response && error.response.data instanceof Blob) {
+                const reader = new FileReader();
+                reader.onload = () => {
+                    try {
+                        const errorObj = JSON.parse(reader.result);
+                        alert(`Erro ao baixar CSV: ${errorObj.detail || 'Erro desconhecido'}`);
+                    } catch (e) {
+                        alert('Erro ao exportar CSV. Verifique se você está autenticado.');
+                    }
+                };
+                reader.readAsText(error.response.data);
+            } else {
+                const errorMsg = error.response?.data?.detail || error.message || 'Erro desconhecido';
+                alert(`Erro ao exportar CSV: ${errorMsg}`);
+            }
+        }
     };
 
     const exportPdf = async (roadmapId) => {

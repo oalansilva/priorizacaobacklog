@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field, field_validator
 
 class DemandItem(BaseModel):
     """Representa um item de backlog a ser priorizado."""
+    id: Optional[str] = Field(None, description="ID único do item.")
     item: str = Field(..., description="Nome ou descrição do item.")
     horas: float = Field(..., ge=0, description="Esforço estimado em horas.")
     cliente: Optional[str] = Field(None, description="Impacto no cliente.")

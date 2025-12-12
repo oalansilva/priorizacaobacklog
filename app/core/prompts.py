@@ -24,6 +24,7 @@ def build_system_prompt(capacidade_total: float, weights: Mapping[str, int] = No
 **IMPORTANTE**: Você deve decidir quais itens cabem dentro da capacidade e atribuir o status correspondente.
 
 Para CADA item, retorne os seguintes campos:
+   - "id": ID original do item (deve ser preservado EXATAMENTE como recebido)
    - "item": nome do item
    - "horas": esforço estimado em horas
    - "status": "Priorizado" (cabe na capacidade) OU "Despriorizado" (não cabe)

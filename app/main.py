@@ -195,6 +195,7 @@ def execute_prioritization(
     items_dict = []
     for item in items:
         items_dict.append({
+            "id": item.id,
             "item": item.titulo,
             "horas": item.esforco_estimado,
             "financeiro": item.impacto_financeiro,
@@ -230,10 +231,43 @@ def execute_prioritization(
     
     updated_count = 0
     not_found_count = 0
+    
+    # Helper function to normalize titles for comparison
+    def normalize_title(title: str) -> str:
+        """Normalize title by stripping whitespace and converting to lowercase"""
+        return title.strip().lower()
+    
     for prioritized_item in result.itens:
-        # Encontrar o item original pelo título (assumindo títulos únicos por enquanto)
-        # Idealmente, passaríamos o ID por todo o fluxo, mas o LLM recria a lista
-        original_item = next((i for i in items if i.titulo == prioritized_item.item), None)
+        # Encontrar o item original
+        original_item = None
+        
+        # 1. Tentar matching por ID (Mais robusto)
+        if prioritized_item.id:
+            original_item = next((i for i in items if str(i.id) == str(prioritized_item.id)), None)
+            if original_item:
+                logger.debug(
+                    "item_matched_by_id", 
+                    id=prioritized_item.id, 
+                    title=prioritized_item.item
+                )
+        
+        # 2. Fallback: Matching exato por Título
+        if not original_item:
+            original_item = next((i for i in items if i.titulo == prioritized_item.item), None)
+        
+        # 3. Fallback: Matching normalizado por Título
+        if not original_item:
+            normalized_search = normalize_title(prioritized_item.item)
+            original_item = next(
+                (i for i in items if normalize_title(i.titulo) == normalized_search), 
+                None
+            )
+            if original_item:
+                logger.info(
+                    "item_matched_with_normalization",
+                    db_title=original_item.titulo,
+                    llm_title=prioritized_item.item
+                )
         
         if original_item:
             logger.info(
@@ -243,7 +277,8 @@ def execute_prioritization(
                 old_prioridade=original_item.prioridade,
                 new_prioridade=prioritized_item.prioridade,
                 old_status=original_item.status,
-                new_status=prioritized_item.status
+                new_status=prioritized_item.status,
+                matched_by="id" if prioritized_item.id and str(original_item.id) == str(prioritized_item.id) else "title"
             )
             original_item.status = prioritized_item.status
             original_item.prioridade = prioritized_item.prioridade
@@ -259,8 +294,13 @@ def execute_prioritization(
             not_found_count += 1
             logger.warning(
                 "item_not_found_in_db",
-                titulo=prioritized_item.item[:50]
+                searched_id=prioritized_item.id,
+                searched_title=prioritized_item.item[:50],
+                available_titles=[i.titulo[:50] for i in items],
+                searched_title_representation=repr(prioritized_item.item[:50])
             )
+
+
     
     logger.info(
         "database_update_complete",
