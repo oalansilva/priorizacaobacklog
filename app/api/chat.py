@@ -27,7 +27,7 @@ import traceback
 
 logger = logging.getLogger(__name__)
 
-@router.post("/", response_model=None)
+@router.post("", response_model=None)
 async def chat(
     request: ChatRequest, 
     repo: DatabaseRepository = Depends(get_repository),

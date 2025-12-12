@@ -24,7 +24,7 @@ function ChatInterface({ messages, setMessages, conversationId, setConversationI
 
         try {
             const token = localStorage.getItem('access_token');
-            const response = await fetch('chat/', {
+            const response = await fetch('chat', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
