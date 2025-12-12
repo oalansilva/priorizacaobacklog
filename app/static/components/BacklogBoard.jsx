@@ -10,7 +10,7 @@ function BacklogBoard() {
 
     const fetchItems = async () => {
         try {
-            const response = await axios.get('items/');
+            const response = await axios.get('items');
             setItems(response.data);
         } catch (error) {
             console.error("Erro ao buscar itens:", error);

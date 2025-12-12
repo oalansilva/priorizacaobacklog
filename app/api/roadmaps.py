@@ -7,7 +7,7 @@ from app.security import get_current_user, TokenData
 
 router = APIRouter(prefix="/roadmaps", tags=["Roadmaps"])
 
-@router.get("/", response_model=List[Roadmap])
+@router.get("", response_model=List[Roadmap])
 def list_roadmaps(
     repo: DatabaseRepository = Depends(get_repository),
     current_user: TokenData = Depends(get_current_user)

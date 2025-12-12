@@ -6,14 +6,14 @@ from app.security import get_current_user, TokenData
 
 router = APIRouter(prefix="/items", tags=["Items"])
 
-@router.get("/", response_model=List[BacklogItem])
+@router.get("", response_model=List[BacklogItem])
 def list_items(
     repo: DatabaseRepository = Depends(get_repository),
     current_user: TokenData = Depends(get_current_user)
 ):
     return repo.list_items(user_id=current_user.user_id)
 
-@router.post("/", response_model=BacklogItem)
+@router.post("", response_model=BacklogItem)
 def add_item(
     item: BacklogItem,
     repo: DatabaseRepository = Depends(get_repository),

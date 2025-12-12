@@ -11,7 +11,7 @@ function RoadmapHistory() {
     const fetchRoadmaps = async () => {
         try {
             setLoading(true);
-            const response = await axios.get('roadmaps/');
+            const response = await axios.get('roadmaps');
             setRoadmaps(response.data);
         } catch (error) {
             console.error('Erro ao carregar roadmaps:', error);
