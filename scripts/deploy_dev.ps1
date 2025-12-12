@@ -77,6 +77,9 @@ if ($LASTEXITCODE -eq 0) {
     Write-Host "Function exists. Updating code..."
     aws lambda update-function-code --function-name $LAMBDA_FUNC_NAME --image-uri $FULL_IMAGE_URI --region $AWS_REGION
     
+    Write-Host "Waiting for code update to complete..."
+    aws lambda wait function-updated --function-name $LAMBDA_FUNC_NAME --region $AWS_REGION
+
     Write-Host "Updating configuration for DEV..."
     # Configurando tabelas _dev para isolamento
     aws lambda update-function-configuration --function-name $LAMBDA_FUNC_NAME --timeout 300 --memory-size 1024 --environment "Variables={BEDROCK_MODEL_ID=us.anthropic.claude-sonnet-4-5-20250929-v1:0,DATABASE_TYPE=dynamodb,DYNAMODB_TABLE_SETTINGS=backlog_settings_dev,DYNAMODB_TABLE_CONVERSATIONS=backlog_conversations_dev,LLM_PROVIDER=bedrock,DYNAMODB_TABLE_ITEMS=backlog_items_dev,DYNAMODB_TABLE_ROADMAPS=backlog_roadmaps_dev,DYNAMODB_TABLE_USERS=backlog_users_dev,RESULTADO_SHEET_NAME=Roadmap}" --region $AWS_REGION

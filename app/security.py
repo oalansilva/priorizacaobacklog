@@ -12,6 +12,8 @@ from passlib.context import CryptContext
 from pydantic import BaseModel
 
 from app.config import Settings, get_settings
+import hashlib
+
 
 # Configurações de Senha e Token
 PWD_CONTEXT = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -31,12 +33,24 @@ class TokenData(BaseModel):
     user_id: Optional[str] = None
 
 
+
+def _pre_hash(password: str) -> str:
+    """
+    Pre-hash da senha com SHA256 para contornar o limite de 72 bytes do bcrypt.
+    Isso permite senhas de qualquer tamanho.
+    """
+    return hashlib.sha256(password.encode('utf-8')).hexdigest()
+
+
 def verify_password(plain_password, hashed_password):
-    return PWD_CONTEXT.verify(plain_password, hashed_password)
+    # Precisamos usar o mesmo pre-hash na verificação
+    # Nota: Isso invalida hashes antigos que não usavam pre-hash. 
+    # Como é um ambiente novo, assumimos que está ok.
+    return PWD_CONTEXT.verify(_pre_hash(plain_password), hashed_password)
 
 
 def get_password_hash(password):
-    return PWD_CONTEXT.hash(password)
+    return PWD_CONTEXT.hash(_pre_hash(password))
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
