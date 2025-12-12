@@ -17,3 +17,4 @@ reportlab>=4.0.0
 # Force rebuild 2024-12-11
 passlib[bcrypt]>=1.7.4
 python-jose[cryptography]>=3.3.0
+bcrypt<5.0.0  # passlib compatibility

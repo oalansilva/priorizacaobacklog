@@ -16,7 +16,14 @@ import hashlib
 
 
 # Configurações de Senha e Token
-PWD_CONTEXT = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Configuração explícita do bcrypt para evitar problemas de detecção de versão
+# truncate_error=False + ident="2b" permite senhas de qualquer tamanho via pre-hash
+PWD_CONTEXT = CryptContext(
+    schemes=["bcrypt"],
+    deprecated="auto",
+    bcrypt__ident="2b",
+    bcrypt__rounds=12,
+)
 OAUTH2_SCHEME = OAuth2PasswordBearer(tokenUrl="/auth/token")
 
 # Constantes de JWT (idealmente no config.py)
