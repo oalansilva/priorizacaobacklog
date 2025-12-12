@@ -1,0 +1,20 @@
+﻿{
+    "events": [
+        {
+            "logStreamName": "2025/12/11/[$LATEST]9a0a531154c3466f8a3f42fdc4a48090",
+            "timestamp": 1765460716854,
+            "message": "START RequestId: b51f35f0-ee52-4bc7-afe3-9734689b1f12 Version: $LATEST\n",
+            "ingestionTime": 1765460725921,
+            "eventId": "39371089604576272481061281739157118875887853890371911680"
+        },
+        {
+            "logStreamName": "2025/12/11/[$LATEST]9a0a531154c3466f8a3f42fdc4a48090",
+            "timestamp": 1765460716855,
+            "message": "[WARNING]\t2025-12-11T13:45:16.855Z\tb51f35f0-ee52-4bc7-afe3-9734689b1f12\t{\"reason\": \"Depend\\u00eancias ausentes ou REDIS_URL n\\u00e3o configurado.\", \"event\": \"rate_limiter.disabled\", \"timestamp\": \"2025-12-11T13:45:16.855382Z\", \"level\": \"warning\"}\n",
+            "ingestionTime": 1765460725921,
+            "eventId": "39371089604598573226259812362298654594160502251877892097"
+        },
+        {
+            "logStreamName": "2025/12/11/[$LATEST]9a0a531154c3466f8a3f42fdc4a48090",
+            "timestamp": 1765460716855,
+            "message": 

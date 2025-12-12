@@ -30,8 +30,8 @@ from app.config import Settings, get_settings
 from app.core.prioritization import PrioritizationService
 from app.logging import get_logger
 from app.models import PrioritizationRequest, PrioritizationResponse
-from app.security import enforce_api_key
-from app.api import chat, items, settings, roadmaps
+from app.security import enforce_api_key, get_current_user, TokenData
+from app.api import chat, items, settings, roadmaps, auth
 
 logger = get_logger(__name__)
 
@@ -54,6 +54,7 @@ app.include_router(chat.router)
 app.include_router(items.router)
 app.include_router(settings.router)
 app.include_router(roadmaps.router)
+app.include_router(auth.router)
 
 # Configure CORS
 app.add_middleware(
@@ -155,6 +156,7 @@ async def get_version() -> dict[str, str]:
 def execute_prioritization(
     capacidade_total: Optional[int] = None,
     percentual_sustentacao: Optional[int] = None,
+    user_id: Optional[str] = None
 ) -> PrioritizationResponse:
     """
     Função compartilhada para executar priorização e atualizar banco de dados.
@@ -181,7 +183,7 @@ def execute_prioritization(
     service = PrioritizationService(settings=settings)
     
     # Obter itens do banco de dados
-    items = repo.list_items()
+    items = repo.list_items(user_id=user_id)
     
     if not items:
         raise HTTPException(
@@ -317,7 +319,8 @@ def execute_prioritization(
             peso_financeiro=current_settings.peso_financeiro,
             peso_negocios=current_settings.peso_negocios,
             peso_cliente=current_settings.peso_cliente,
-            peso_okr=current_settings.peso_okr
+            peso_okr=current_settings.peso_okr,
+            user_id=user_id
         )
         
         logger.info("roadmap_object_created", roadmap_id=roadmap.id)
@@ -346,6 +349,7 @@ async def priorizar_backlog(
     response: Response,
     capacidade_total: Optional[int] = None,
     percentual_sustentacao: Optional[int] = None,
+    current_user: TokenData = Depends(get_current_user)
 ) -> PrioritizationResponse:
     """
     Prioriza itens do backlog armazenados no banco de dados.
@@ -361,7 +365,7 @@ async def priorizar_backlog(
     await rate_limit_dependency(request, response, None)
 
     try:
-        return execute_prioritization(capacidade_total, percentual_sustentacao)
+        return execute_prioritization(capacidade_total, percentual_sustentacao, user_id=current_user.user_id)
 
     except HTTPException:
         raise

@@ -5,6 +5,9 @@ from langchain_core.messages import HumanMessage, AIMessage
 from app.core.database import get_repository, DatabaseRepository
 from app.models.db import Conversation, ConversationMessage
 from app.core.agent import get_agent_executor
+from app.security import get_current_user, TokenData
+from app.user_context import user_id_ctx
+
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
 
@@ -25,8 +28,15 @@ import traceback
 logger = logging.getLogger(__name__)
 
 @router.post("/", response_model=None)
-async def chat(request: ChatRequest, repo: DatabaseRepository = Depends(get_repository)):
-    logger.debug(f"Chat endpoint called for conversation {request.conversation_id}")
+async def chat(
+    request: ChatRequest, 
+    repo: DatabaseRepository = Depends(get_repository),
+    current_user: TokenData = Depends(get_current_user)
+):
+    logger.debug(f"Chat endpoint called for conversation {request.conversation_id} by user {current_user.user_id}")
+    
+    # Set context for this request
+    token = user_id_ctx.set(current_user.user_id)
     # 1. Retrieve or create conversation
     if request.conversation_id:
         conversation = repo.get_conversation(request.conversation_id)
@@ -102,4 +112,12 @@ async def chat(request: ChatRequest, repo: DatabaseRepository = Depends(get_repo
             logger.error(f"Error in event_generator: {e}\n{error_trace}")
             yield f"\n\n[Erro ao processar: {str(e)}]"
 
-    return StreamingResponse(event_generator(), media_type="text/plain", headers={"X-Conversation-ID": conversation.id})
+    async def cleanup_generator():
+        try:
+            async for chunk in event_generator():
+                yield chunk
+        finally:
+            # Reset context after generator finishes
+            user_id_ctx.reset(token)
+
+    return StreamingResponse(cleanup_generator(), media_type="text/plain", headers={"X-Conversation-ID": conversation.id})

@@ -3,7 +3,7 @@ import sqlite3
 import json
 import os
 from typing import List, Optional
-from app.models.db import BacklogItem, Conversation, ConversationMessage, SystemSettings, Roadmap, RoadmapItem
+from app.models.db import BacklogItem, Conversation, ConversationMessage, SystemSettings, Roadmap, RoadmapItem, User
 
 class DatabaseRepository(abc.ABC):
     @abc.abstractmethod
@@ -11,7 +11,7 @@ class DatabaseRepository(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def list_items(self) -> List[BacklogItem]:
+    def list_items(self, user_id: Optional[str] = None) -> List[BacklogItem]:
         pass
 
     @abc.abstractmethod
@@ -47,7 +47,7 @@ class DatabaseRepository(abc.ABC):
         pass
     
     @abc.abstractmethod
-    def list_roadmaps(self) -> List[Roadmap]:
+    def list_roadmaps(self, user_id: Optional[str] = None) -> List[Roadmap]:
         pass
     
     @abc.abstractmethod
@@ -56,6 +56,16 @@ class DatabaseRepository(abc.ABC):
     
     @abc.abstractmethod
     def delete_roadmap(self, roadmap_id: str) -> bool:
+        pass
+        
+    @abc.abstractmethod
+    def create_user(self, user: User) -> User:
+        """Cria um novo usuário."""
+        pass
+        
+    @abc.abstractmethod
+    def get_user_by_email(self, email: str) -> Optional[User]:
+        """Busca usuário por email."""
         pass
 
 class SQLiteRepository(DatabaseRepository):
@@ -162,6 +172,18 @@ class SQLiteRepository(DatabaseRepository):
                     peso_okr INTEGER,
                     itens_json TEXT
                 )
+                )
+            """)
+
+            # Create users table
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS users (
+                    id TEXT PRIMARY KEY,
+                    email TEXT UNIQUE,
+                    password_hash TEXT,
+                    full_name TEXT,
+                    created_at TEXT
+                )
             """)
 
     def add_item(self, item: BacklogItem) -> BacklogItem:
@@ -179,10 +201,18 @@ class SQLiteRepository(DatabaseRepository):
             )
         return item
 
-    def list_items(self) -> List[BacklogItem]:
+        return item
+
+    def list_items(self, user_id: Optional[str] = None) -> List[BacklogItem]:
         items = []
         with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.execute("SELECT * FROM items ORDER BY prioridade ASC, created_at ASC")
+            if user_id:
+                cursor = conn.execute("SELECT * FROM items WHERE user_id = ? ORDER BY prioridade ASC, created_at ASC", (user_id,))
+            else:
+                # Fallback for legacy or admin (or show all if no user_id passed)
+                # Ideally in multi-user mode we might want to strictly require user_id
+                cursor = conn.execute("SELECT * FROM items ORDER BY prioridade ASC, created_at ASC")
+                
             for row in cursor:
                 # Handle potential missing columns if DB schema varies (though migration should fix it)
                 # Assuming schema matches add_item order
@@ -299,12 +329,21 @@ class SQLiteRepository(DatabaseRepository):
             )
         return roadmap
 
-    def list_roadmaps(self) -> List[Roadmap]:
+        return roadmap
+
+    def list_roadmaps(self, user_id: Optional[str] = None) -> List[Roadmap]:
         roadmaps = []
         with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.execute(
-                "SELECT * FROM roadmaps ORDER BY created_at DESC"
-            )
+            if user_id:
+                cursor = conn.execute(
+                    "SELECT * FROM roadmaps WHERE user_id = ? ORDER BY created_at DESC", 
+                    (user_id,)
+                )
+            else:
+                cursor = conn.execute(
+                    "SELECT * FROM roadmaps ORDER BY created_at DESC"
+                )
+                
             for row in cursor:
                 itens_data = json.loads(row[13])  # itens_json é a coluna 13
                 itens = [RoadmapItem(**item) for item in itens_data]
@@ -360,6 +399,28 @@ class SQLiteRepository(DatabaseRepository):
             cursor = conn.execute("DELETE FROM roadmaps WHERE id = ?", (roadmap_id,))
             return cursor.rowcount > 0
 
+    def create_user(self, user: User) -> User:
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute(
+                "INSERT INTO users (id, email, password_hash, full_name, created_at) VALUES (?, ?, ?, ?, ?)",
+                (user.id, user.email, user.password_hash, user.full_name, user.created_at)
+            )
+        return user
+
+    def get_user_by_email(self, email: str) -> Optional[User]:
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute("SELECT * FROM users WHERE email = ?", (email,))
+            row = cursor.fetchone()
+            if row:
+                return User(
+                    id=row[0],
+                    email=row[1],
+                    password_hash=row[2],
+                    full_name=row[3],
+                    created_at=row[4]
+                )
+        return None
+
 
 class DynamoDBRepository(DatabaseRepository):
     def __init__(self):
@@ -371,7 +432,9 @@ class DynamoDBRepository(DatabaseRepository):
         self.table_items = self.dynamodb.Table(self.settings.dynamodb_table_items)
         self.table_conversations = self.dynamodb.Table(self.settings.dynamodb_table_conversations)
         self.table_settings = self.dynamodb.Table(self.settings.dynamodb_table_settings)
+        self.table_settings = self.dynamodb.Table(self.settings.dynamodb_table_settings)
         self.table_roadmaps = self.dynamodb.Table(self.settings.dynamodb_table_roadmaps)
+        self.table_users = self.dynamodb.Table(self.settings.dynamodb_table_users)
 
     def _convert_floats_to_decimals(self, obj):
         from decimal import Decimal
@@ -391,15 +454,23 @@ class DynamoDBRepository(DatabaseRepository):
         self.table_items.put_item(Item=item_dict)
         return item
 
-    def list_items(self) -> List[BacklogItem]:
+    def list_items(self, user_id: Optional[str] = None) -> List[BacklogItem]:
         # Scan is okay for small backlogs, but for production with millions of items 
         # Query with GSI would be better. For now, Scan is sufficient.
-        response = self.table_items.scan()
+        
+        from boto3.dynamodb.conditions import Key, Attr
+        
+        scan_kwargs = {}
+        if user_id:
+            scan_kwargs['FilterExpression'] = Attr('user_id').eq(user_id)
+            
+        response = self.table_items.scan(**scan_kwargs)
         items_data = response.get('Items', [])
         
         # Handle pagination if needed
         while 'LastEvaluatedKey' in response:
-            response = self.table_items.scan(ExclusiveStartKey=response['LastEvaluatedKey'])
+            scan_kwargs['ExclusiveStartKey'] = response['LastEvaluatedKey']
+            response = self.table_items.scan(**scan_kwargs)
             items_data.extend(response.get('Items', []))
             
         # Convert decimals to int/float if needed (boto3 returns Decimal)
@@ -469,12 +540,19 @@ class DynamoDBRepository(DatabaseRepository):
         self.table_roadmaps.put_item(Item=data)
         return roadmap
     
-    def list_roadmaps(self) -> List[Roadmap]:
-        response = self.table_roadmaps.scan()
+    def list_roadmaps(self, user_id: Optional[str] = None) -> List[Roadmap]:
+        from boto3.dynamodb.conditions import Key, Attr
+        
+        scan_kwargs = {}
+        if user_id:
+            scan_kwargs['FilterExpression'] = Attr('user_id').eq(user_id)
+            
+        response = self.table_roadmaps.scan(**scan_kwargs)
         roadmaps_data = response.get('Items', [])
         
         while 'LastEvaluatedKey' in response:
-            response = self.table_roadmaps.scan(ExclusiveStartKey=response['LastEvaluatedKey'])
+            scan_kwargs['ExclusiveStartKey'] = response['LastEvaluatedKey']
+            response = self.table_roadmaps.scan(**scan_kwargs)
             roadmaps_data.extend(response.get('Items', []))
         
         roadmaps = [Roadmap(**roadmap) for roadmap in roadmaps_data]
@@ -494,6 +572,29 @@ class DynamoDBRepository(DatabaseRepository):
             return True
         except Exception:
             return False
+            
+    def create_user(self, user: User) -> User:
+        data = user.model_dump()
+        # DynamoDB doesn't like float, but User doesn't have floats.
+        self.table_users.put_item(Item=data)
+        return user
+
+    def get_user_by_email(self, email: str) -> Optional[User]:
+        # Scan is inefficient for getting by email if not key. 
+        # Ideally Email should be the Key or GSI. Assuming SCAN for now or if ID is not email.
+        # Ideally we should redesign table to use Email as PK or have GSI.
+        # But for this MVP/Refactor, a Scan with Filter or GSI is needed.
+        # Let's assume Scan with FilterExpression for now as it's simplest without changing infra definition too much right now.
+        from boto3.dynamodb.conditions import Key, Attr
+        
+        response = self.table_users.scan(
+            FilterExpression=Attr('email').eq(email)
+        )
+        items = response.get('Items', [])
+        if items:
+            return User(**items[0])
+            
+        return None
 
 
 def get_repository() -> DatabaseRepository:

@@ -3,16 +3,24 @@ from fastapi.responses import StreamingResponse
 from typing import List
 from app.core.database import get_repository, DatabaseRepository
 from app.models.db import Roadmap
+from app.security import get_current_user, TokenData
 
 router = APIRouter(prefix="/roadmaps", tags=["Roadmaps"])
 
 @router.get("/", response_model=List[Roadmap])
-def list_roadmaps(repo: DatabaseRepository = Depends(get_repository)):
+def list_roadmaps(
+    repo: DatabaseRepository = Depends(get_repository),
+    current_user: TokenData = Depends(get_current_user)
+):
     """Lista todos os roadmaps salvos ordenados por data (mais recente primeiro)."""
-    return repo.list_roadmaps()
+    return repo.list_roadmaps(user_id=current_user.user_id)
 
 @router.get("/{roadmap_id}", response_model=Roadmap)
-def get_roadmap(roadmap_id: str, repo: DatabaseRepository = Depends(get_repository)):
+def get_roadmap(
+    roadmap_id: str, 
+    repo: DatabaseRepository = Depends(get_repository),
+    current_user: TokenData = Depends(get_current_user)
+):
     """Obtém um roadmap específico pelo ID."""
     roadmap = repo.get_roadmap(roadmap_id)
     if not roadmap:
@@ -20,7 +28,11 @@ def get_roadmap(roadmap_id: str, repo: DatabaseRepository = Depends(get_reposito
     return roadmap
 
 @router.get("/{roadmap_id}/export")
-def export_roadmap(roadmap_id: str, repo: DatabaseRepository = Depends(get_repository)):
+def export_roadmap(
+    roadmap_id: str, 
+    repo: DatabaseRepository = Depends(get_repository),
+    current_user: TokenData = Depends(get_current_user)
+):
     """Exporta roadmap para arquivo CSV compatível com Excel."""
     from app.services.csv_export import export_roadmap_to_csv
     from datetime import datetime
@@ -68,7 +80,11 @@ def debug_pdf():
     return results
 
 @router.get("/{roadmap_id}/export-pdf")
-def export_roadmap_pdf(roadmap_id: str, repo: DatabaseRepository = Depends(get_repository)):
+def export_roadmap_pdf(
+    roadmap_id: str, 
+    repo: DatabaseRepository = Depends(get_repository),
+    current_user: TokenData = Depends(get_current_user)
+):
     """Exporta roadmap para arquivo PDF."""
     import logging
     logger = logging.getLogger(__name__)
@@ -109,7 +125,11 @@ def export_roadmap_pdf(roadmap_id: str, repo: DatabaseRepository = Depends(get_r
         raise HTTPException(status_code=500, detail=f"Erro ao gerar PDF: {str(e)}")
 
 @router.delete("/{roadmap_id}")
-def delete_roadmap(roadmap_id: str, repo: DatabaseRepository = Depends(get_repository)):
+def delete_roadmap(
+    roadmap_id: str, 
+    repo: DatabaseRepository = Depends(get_repository),
+    current_user: TokenData = Depends(get_current_user)
+):
     """Deleta um roadmap pelo ID."""
     deleted = repo.delete_roadmap(roadmap_id)
     if not deleted:

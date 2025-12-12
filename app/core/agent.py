@@ -7,6 +7,8 @@ from app.core.database import DatabaseRepository
 from app.models.db import BacklogItem
 from app.config import get_settings
 from app.core.prioritization import PrioritizationService
+from app.core.prioritization import PrioritizationService
+from app.user_context import user_id_ctx
 import traceback
 
 # Global repository instance for tools to access
@@ -56,6 +58,8 @@ def add_backlog_item(
         return "Erro: Repositório não inicializado."
     
     try:
+        user_id = user_id_ctx.get()
+        
         item = BacklogItem(
             titulo=titulo,
             descricao=descricao,
@@ -66,7 +70,8 @@ def add_backlog_item(
             impacto_negocios=impacto_negocios,
             impacto_cliente=impacto_cliente,
             okr=okr,
-            estimado_qp=estimado_qp
+            estimado_qp=estimado_qp,
+            user_id=user_id
         )
         
         logger.info(f"Tentando adicionar item: {titulo} (área: {area}, esforço: {esforco_estimado}h)")
@@ -104,8 +109,9 @@ def find_backlog_item_by_title(titulo_busca: str) -> str:
         return "Erro: Repositório não inicializado."
     
     try:
-        logger.info(f"Buscando itens com título contendo: '{titulo_busca}'")
-        items = _repository.list_items()
+        user_id = user_id_ctx.get()
+        logger.info(f"Buscando itens com título contendo: '{titulo_busca}' para user {user_id}")
+        items = _repository.list_items(user_id=user_id)
         
         if not items:
             return "O backlog está vazio."
@@ -194,8 +200,9 @@ def update_backlog_item(
     
     try:
         # Buscar item existente
-        logger.info(f"Buscando item com ID: {item_id}")
-        items = _repository.list_items()
+        user_id = user_id_ctx.get()
+        logger.info(f"Buscando item com ID: {item_id} para user {user_id}")
+        items = _repository.list_items(user_id=user_id)
         item = next((i for i in items if i.id == item_id), None)
         
         if not item:
@@ -297,7 +304,8 @@ def list_backlog_items() -> str:
     if _repository is None:
         return "Erro: Repositório não inicializado."
     
-    items = _repository.list_items()
+    user_id = user_id_ctx.get()
+    items = _repository.list_items(user_id=user_id)
     if not items:
         return "O backlog está vazio."
     
@@ -413,7 +421,8 @@ def prioritize_backlog(capacidade_total: Optional[int] = None, percentual_susten
                     
                     result = execute_prioritization(
                         capacidade_total=cap_total,
-                        percentual_sustentacao=perc_sust
+                        percentual_sustentacao=perc_sust,
+                        user_id=user_id_ctx.get()
                     )
                     
                     priorizados = [i for i in result.itens if i.status == "Priorizado"]

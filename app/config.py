@@ -55,6 +55,7 @@ class Settings(BaseModel):
     dynamodb_table_conversations: str = Field(default="backlog_conversations", alias="DYNAMODB_TABLE_CONVERSATIONS")
     dynamodb_table_settings: str = Field(default="backlog_settings", alias="DYNAMODB_TABLE_SETTINGS")
     dynamodb_table_roadmaps: str = Field(default="backlog_roadmaps", alias="DYNAMODB_TABLE_ROADMAPS")
+    dynamodb_table_users: str = Field(default="backlog_users", alias="DYNAMODB_TABLE_USERS")
     root_path: str = Field(default="", alias="ROOT_PATH")
 
     @field_validator("llm_provider")

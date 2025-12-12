@@ -3,6 +3,14 @@ from typing import Optional, List
 from pydantic import BaseModel, Field
 import uuid
 
+class User(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    email: str
+    password_hash: str
+    full_name: str
+    created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+
+
 class BacklogItem(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     titulo: str
@@ -23,7 +31,9 @@ class BacklogItem(BaseModel):
     okr: str = "Não"  # Sim/Não
     must_have: str = "Não"  # Sim/Não - Item obrigatório para priorização
     estimado_qp: str = "Não"  # Sim/Não (apenas informativo)
+    estimado_qp: str = "Não"  # Sim/Não (apenas informativo)
     justificativa: Optional[str] = None
+    user_id: Optional[str] = None  # Dono do item
 
 
 class ConversationMessage(BaseModel):
@@ -36,6 +46,7 @@ class Conversation(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     messages: List[ConversationMessage] = []
     updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+    user_id: Optional[str] = None  # Dono da conversa
 
 class SystemSettings(BaseModel):
     id: int = 1
@@ -46,6 +57,7 @@ class SystemSettings(BaseModel):
     peso_cliente: int = 25
     peso_okr: int = 25
     updated_at: Optional[str] = Field(default_factory=lambda: datetime.now().isoformat())
+    user_id: Optional[str] = None  # Configurações do usuário (se None, usa global/default)
     
     # Status de priorização assíncrona
     last_prioritization_status: Optional[str] = None  # "running", "completed", "error"
@@ -76,6 +88,7 @@ class Roadmap(BaseModel):
     """Histórico de uma priorização executada."""
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    user_id: Optional[str] = None  # Dono do roadmap
     
     # Configuração usada
     capacidade_total: int
