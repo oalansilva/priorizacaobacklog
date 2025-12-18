@@ -119,6 +119,30 @@ class SQLiteRepository(DatabaseRepository):
                 conn.execute("ALTER TABLE items ADD COLUMN score REAL DEFAULT 0.0")
             except sqlite3.OperationalError:
                 pass
+            
+            # Migration: Add workflow_stage column if not exists
+            try:
+                conn.execute("ALTER TABLE items ADD COLUMN workflow_stage TEXT DEFAULT 'upstream'")
+            except sqlite3.OperationalError:
+                pass
+            
+            # Migration: Add upstream_completed_at column if not exists
+            try:
+                conn.execute("ALTER TABLE items ADD COLUMN upstream_completed_at TEXT")
+            except sqlite3.OperationalError:
+                pass
+            
+            # Migration: Add user_id column if not exists
+            try:
+                conn.execute("ALTER TABLE items ADD COLUMN user_id TEXT")
+            except sqlite3.OperationalError:
+                pass
+            
+            # Create index on workflow_stage for performance
+            try:
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_workflow_stage ON items(workflow_stage)")
+            except sqlite3.OperationalError:
+                pass
 
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS conversations (
@@ -144,6 +168,27 @@ class SQLiteRepository(DatabaseRepository):
             for col in ['peso_financeiro', 'peso_negocios', 'peso_cliente', 'peso_okr']:
                 try:
                     conn.execute(f"ALTER TABLE settings ADD COLUMN {col} INTEGER DEFAULT 25")
+                except sqlite3.OperationalError:
+                    pass
+            
+            # Migration: Add capacity allocation columns if not exists
+            for col in ['capacity_upstream_percent', 'capacity_downstream_percent', 'capacity_sustentacao_percent']:
+                default_val = 40.0 if 'upstream' in col or 'downstream' in col else 20.0
+                try:
+                    conn.execute(f"ALTER TABLE settings ADD COLUMN {col} REAL DEFAULT {default_val}")
+                except sqlite3.OperationalError:
+                    pass
+            
+            # Migration: Add user_id column to settings if not exists
+            try:
+                conn.execute("ALTER TABLE settings ADD COLUMN user_id TEXT")
+            except sqlite3.OperationalError:
+                pass
+            
+            # Migration: Add prioritization status columns if not exists
+            for col in ['last_prioritization_status', 'last_prioritization_message', 'last_prioritization_time']:
+                try:
+                    conn.execute(f"ALTER TABLE settings ADD COLUMN {col} TEXT")
                 except sqlite3.OperationalError:
                     pass
 
@@ -172,9 +217,22 @@ class SQLiteRepository(DatabaseRepository):
                     peso_okr INTEGER,
                     itens_json TEXT
                 )
-                )
             """)
-
+            
+            # Migration: Add capacity allocation columns to roadmaps if not exists
+            for col in ['capacity_upstream_percent', 'capacity_downstream_percent', 'capacity_sustentacao_percent']:
+                default_val = 40.0 if 'upstream' in col or 'downstream' in col else 20.0
+                try:
+                    conn.execute(f"ALTER TABLE roadmaps ADD COLUMN {col} REAL DEFAULT {default_val}")
+                except sqlite3.OperationalError:
+                    pass
+            
+            # Migration: Add user_id column to roadmaps if not exists
+            try:
+                conn.execute("ALTER TABLE roadmaps ADD COLUMN user_id TEXT")
+            except sqlite3.OperationalError:
+                pass
+            
             # Create users table
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS users (
@@ -189,18 +247,16 @@ class SQLiteRepository(DatabaseRepository):
     def add_item(self, item: BacklogItem) -> BacklogItem:
         with sqlite3.connect(self.db_path) as conn:
             conn.execute(
-                "INSERT INTO items VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                """INSERT INTO items VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     item.id, item.titulo, item.descricao,
                     item.esforco_estimado, item.area, item.dependencias,
                     item.status, item.prioridade, item.created_at,
                     item.categoria, item.impacto_financeiro, item.impacto_negocios,
                     item.impacto_cliente, item.okr, item.must_have, item.estimado_qp, item.justificativa,
-                    item.score
+                    item.score, item.workflow_stage, item.upstream_completed_at, item.user_id
                 )
             )
-        return item
-
         return item
 
     def list_items(self, user_id: Optional[str] = None) -> List[BacklogItem]:
@@ -210,19 +266,20 @@ class SQLiteRepository(DatabaseRepository):
                 cursor = conn.execute("SELECT * FROM items WHERE user_id = ? ORDER BY prioridade ASC, created_at ASC", (user_id,))
             else:
                 # Fallback for legacy or admin (or show all if no user_id passed)
-                # Ideally in multi-user mode we might want to strictly require user_id
                 cursor = conn.execute("SELECT * FROM items ORDER BY prioridade ASC, created_at ASC")
                 
             for row in cursor:
-                # Handle potential missing columns if DB schema varies (though migration should fix it)
-                # Assuming schema matches add_item order
+                # Handle potential missing columns gracefully
                 items.append(BacklogItem(
                     id=row[0], titulo=row[1], descricao=row[2],
                     esforco_estimado=row[3], area=row[4], dependencias=row[5],
                     status=row[6], prioridade=row[7], created_at=row[8],
                     categoria=row[9], impacto_financeiro=row[10], impacto_negocios=row[11],
                     impacto_cliente=row[12], okr=row[13], must_have=row[14], estimado_qp=row[15], justificativa=row[16],
-                    score=row[17] if len(row) > 17 else 0.0
+                    score=row[17] if len(row) > 17 else 0.0,
+                    workflow_stage=row[18] if len(row) > 18 else "upstream",
+                    upstream_completed_at=row[19] if len(row) > 19 else None,
+                    user_id=row[20] if len(row) > 20 else None
                 ))
         return items
 
@@ -250,13 +307,14 @@ class SQLiteRepository(DatabaseRepository):
             conn.execute(
                 """UPDATE items SET titulo=?, descricao=?, esforco_estimado=?, 
                    area=?, dependencias=?, status=?, prioridade=?, categoria=?, impacto_financeiro=?, 
-                   impacto_negocios=?, impacto_cliente=?, okr=?, must_have=?, estimado_qp=?, justificativa=?, score=? WHERE id=?""",
+                   impacto_negocios=?, impacto_cliente=?, okr=?, must_have=?, estimado_qp=?, justificativa=?, score=?,
+                   workflow_stage=?, upstream_completed_at=?, user_id=? WHERE id=?""",
                 (
                     item.titulo, item.descricao,
                     item.esforco_estimado, item.area, item.dependencias,
                     item.status, item.prioridade, item.categoria, item.impacto_financeiro,
                     item.impacto_negocios, item.impacto_cliente, item.okr, item.must_have, item.estimado_qp,
-                    item.justificativa, item.score,
+                    item.justificativa, item.score, item.workflow_stage, item.upstream_completed_at, item.user_id,
                     item.id
                 )
             )
@@ -276,7 +334,9 @@ class SQLiteRepository(DatabaseRepository):
             cursor = conn.execute("""
                 SELECT capacidade_total, percentual_sustentacao, 
                        peso_financeiro, peso_negocios, peso_cliente, peso_okr,
-                       updated_at 
+                       updated_at, user_id,
+                       capacity_upstream_percent, capacity_downstream_percent, capacity_sustentacao_percent,
+                       last_prioritization_status, last_prioritization_message, last_prioritization_time
                 FROM settings WHERE id = 1
             """)
             row = cursor.fetchone()
@@ -288,7 +348,14 @@ class SQLiteRepository(DatabaseRepository):
                     peso_negocios=row[3] if row[3] is not None else 25,
                     peso_cliente=row[4] if row[4] is not None else 25,
                     peso_okr=row[5] if row[5] is not None else 25,
-                    updated_at=row[6]
+                    updated_at=row[6],
+                    user_id=row[7] if len(row) > 7 else None,
+                    capacity_upstream_percent=row[8] if len(row) > 8 and row[8] is not None else 40.0,
+                    capacity_downstream_percent=row[9] if len(row) > 9 and row[9] is not None else 40.0,
+                    capacity_sustentacao_percent=row[10] if len(row) > 10 and row[10] is not None else 20.0,
+                    last_prioritization_status=row[11] if len(row) > 11 else None,
+                    last_prioritization_message=row[12] if len(row) > 12 else None,
+                    last_prioritization_time=row[13] if len(row) > 13 else None
                 )
             return SystemSettings()
 
@@ -298,12 +365,17 @@ class SQLiteRepository(DatabaseRepository):
                 """UPDATE settings SET 
                    capacidade_total=?, percentual_sustentacao=?, 
                    peso_financeiro=?, peso_negocios=?, peso_cliente=?, peso_okr=?,
-                   updated_at=? WHERE id=1""",
+                   updated_at=?, user_id=?,
+                   capacity_upstream_percent=?, capacity_downstream_percent=?, capacity_sustentacao_percent=?,
+                   last_prioritization_status=?, last_prioritization_message=?, last_prioritization_time=?
+                   WHERE id=1""",
                 (
                     settings.capacidade_total, settings.percentual_sustentacao,
                     settings.peso_financeiro, settings.peso_negocios, settings.peso_cliente, 
                     settings.peso_okr,
-                    settings.updated_at
+                    settings.updated_at, settings.user_id,
+                    settings.capacity_upstream_percent, settings.capacity_downstream_percent, settings.capacity_sustentacao_percent,
+                    settings.last_prioritization_status, settings.last_prioritization_message, settings.last_prioritization_time
                 )
             )
         return settings
@@ -317,18 +389,19 @@ class SQLiteRepository(DatabaseRepository):
                 """INSERT INTO roadmaps 
                    (id, created_at, capacidade_total, percentual_sustentacao, capacidade_iniciativas,
                     total_itens, itens_priorizados, itens_despriorizados, horas_alocadas,
-                    peso_financeiro, peso_negocios, peso_cliente, peso_okr, itens_json)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    peso_financeiro, peso_negocios, peso_cliente, peso_okr, itens_json,
+                    capacity_upstream_percent, capacity_downstream_percent, capacity_sustentacao_percent, user_id)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     roadmap.id, roadmap.created_at, roadmap.capacidade_total,
                     roadmap.percentual_sustentacao, roadmap.capacidade_iniciativas,
                     roadmap.total_itens, roadmap.itens_priorizados, roadmap.itens_despriorizados,
                     roadmap.horas_alocadas, roadmap.peso_financeiro, roadmap.peso_negocios,
-                    roadmap.peso_cliente, roadmap.peso_okr, itens_json
+                    roadmap.peso_cliente, roadmap.peso_okr, itens_json,
+                    roadmap.capacity_upstream_percent, roadmap.capacity_downstream_percent, roadmap.capacity_sustentacao_percent,
+                    roadmap.user_id
                 )
             )
-        return roadmap
-
         return roadmap
 
     def list_roadmaps(self, user_id: Optional[str] = None) -> List[Roadmap]:

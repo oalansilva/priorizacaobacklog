@@ -256,93 +256,231 @@ function RoadmapHistory() {
                 </div>
 
                 <div className="bg-white rounded-lg shadow p-6 mb-6">
-                    <h3 className="text-lg font-semibold mb-4">Resumo</h3>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div>
-                            <p className="text-sm text-gray-600">Data</p>
-                            <p className="font-semibold">{formatDate(selectedRoadmap.created_at)}</p>
-                        </div>
-                        <div>
-                            <p className="text-sm text-gray-600">Capacidade Total</p>
-                            <p className="font-semibold">{selectedRoadmap.capacidade_total}h</p>
-                        </div>
-                        <div>
-                            <p className="text-sm text-gray-600">Itens Priorizados</p>
-                            <p className="font-semibold text-green-600">{selectedRoadmap.itens_priorizados}</p>
-                        </div>
-                        <div>
-                            <p className="text-sm text-gray-600">Horas Alocadas</p>
-                            <p className="font-semibold">{selectedRoadmap.horas_alocadas}h</p>
-                        </div>
-                    </div>
+                    <h3 className="text-lg font-semibold mb-4">Resumo da Capacidade</h3>
+                    {(() => {
+                        const upstreamHours = priorizados
+                            .filter(i => i.workflow_stage === 'upstream')
+                            .reduce((acc, curr) => acc + (curr.esforco_estimado || 0), 0);
+
+                        const downstreamHours = priorizados
+                            .filter(i => i.workflow_stage === 'downstream')
+                            .reduce((acc, curr) => acc + (curr.esforco_estimado || 0), 0);
+
+                        const sustentacaoHours = selectedRoadmap.capacidade_total - selectedRoadmap.capacidade_iniciativas;
+
+                        const despriorizadosHours = despriorizados
+                            .reduce((acc, curr) => acc + (curr.esforco_estimado || 0), 0);
+
+                        return (
+                            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                                <div className="bg-gray-50 p-3 rounded border border-gray-100">
+                                    <p className="text-xs text-gray-500 uppercase font-bold">Data</p>
+                                    <p className="font-semibold text-gray-900">{formatDate(selectedRoadmap.created_at)}</p>
+                                    <p className="text-xs text-gray-400 mt-1">Total: {selectedRoadmap.capacidade_total}h</p>
+                                </div>
+                                <div className="bg-blue-50 p-3 rounded border border-blue-100">
+                                    <p className="text-xs text-blue-600 uppercase font-bold">📋 Upstream</p>
+                                    <p className="font-semibold text-blue-900">{upstreamHours}h</p>
+                                    <p className="text-xs text-blue-500 mt-1">
+                                        {((upstreamHours / selectedRoadmap.capacidade_total) * 100).toFixed(1)}%
+                                    </p>
+                                </div>
+                                <div className="bg-green-50 p-3 rounded border border-green-100">
+                                    <p className="text-xs text-green-600 uppercase font-bold">🔨 Downstream</p>
+                                    <p className="font-semibold text-green-900">{downstreamHours}h</p>
+                                    <p className="text-xs text-green-500 mt-1">
+                                        {((downstreamHours / selectedRoadmap.capacidade_total) * 100).toFixed(1)}%
+                                    </p>
+                                </div>
+                                <div className="bg-orange-50 p-3 rounded border border-orange-100">
+                                    <p className="text-xs text-orange-600 uppercase font-bold">🔧 Sustentação</p>
+                                    <p className="font-semibold text-orange-900">{Math.round(sustentacaoHours)}h</p>
+                                    <p className="text-xs text-orange-500 mt-1">
+                                        {((sustentacaoHours / selectedRoadmap.capacidade_total) * 100).toFixed(1)}% (Reserva)
+                                    </p>
+                                </div>
+                                <div className="bg-red-50 p-3 rounded border border-red-100">
+                                    <p className="text-xs text-red-600 uppercase font-bold">❌ Despriorizados</p>
+                                    <p className="font-semibold text-red-900">{despriorizadosHours}h</p>
+                                    <p className="text-xs text-red-500 mt-1">
+                                        {despriorizados.length} itens excedentes
+                                    </p>
+                                </div>
+                            </div>
+                        );
+                    })()}
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* Priorizados */}
-                    <div className="bg-white rounded-lg shadow p-6">
-                        <h3 className="text-lg font-semibold mb-4 text-green-700">
-                            ✅ Priorizados ({priorizados.length})
-                        </h3>
-                        <div className="space-y-3 max-h-96 overflow-y-auto">
-                            {priorizados.map((item) => (
-                                <div key={item.id} className="border-l-4 border-green-500 bg-green-50 p-3 rounded">
-                                    <div className="flex justify-between items-start">
-                                        <div className="flex-1">
-                                            <span className="inline-block bg-green-600 text-white text-xs px-2 py-1 rounded mr-2">
-                                                #{item.prioridade}
-                                            </span>
-                                            <span className="font-semibold">{item.titulo}</span>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            {item.justificativa && (
-                                                <button
-                                                    onClick={() => setViewingJustification(item)}
-                                                    className="text-gray-400 hover:text-blue-600 p-1 rounded hover:bg-blue-50 transition-colors"
-                                                    title="Ver Justificativa"
-                                                >
-                                                    💬
-                                                </button>
-                                            )}
-                                            <span className="text-sm text-gray-600">{item.esforco_estimado}h</span>
-                                        </div>
-                                    </div>
-                                    <p className="text-sm text-gray-600 mt-1">{item.area}</p>
-                                    <p className="text-sm text-gray-500 mt-1">Score: {item.score.toFixed(1)}%</p>
+                {/* Group by Workflow Stage */}
+                <div className="space-y-6">
+                    {/* Upstream Items */}
+                    {(() => {
+                        const upstreamItems = priorizados.filter(i => i.workflow_stage === 'upstream');
+                        if (upstreamItems.length === 0) return null;
+
+                        return (
+                            <div className="bg-white rounded-lg shadow-md border-l-4 border-blue-500">
+                                <div className="bg-blue-50 px-6 py-4 border-b border-blue-100">
+                                    <h3 className="text-lg font-semibold text-blue-900 flex items-center gap-2">
+                                        📋 Upstream - Descoberta e Design
+                                        <span className="text-sm font-normal text-blue-600">
+                                            ({upstreamItems.length} {upstreamItems.length === 1 ? 'item' : 'itens'})
+                                        </span>
+                                    </h3>
+                                    <p className="text-sm text-blue-700 mt-1">
+                                        Pesquisa, validação, design e planejamento
+                                    </p>
                                 </div>
-                            ))}
-                        </div>
-                    </div>
+                                <div className="p-6 space-y-3 max-h-96 overflow-y-auto">
+                                    {upstreamItems.map((item) => (
+                                        <div key={item.id} className="border-l-4 border-blue-400 bg-blue-50 p-4 rounded-r hover:bg-blue-100 transition-colors">
+                                            <div className="flex justify-between items-start">
+                                                <div className="flex-1">
+                                                    <div className="flex items-center gap-2 mb-2">
+                                                        <span className="inline-block bg-blue-600 text-white text-xs px-2 py-1 rounded font-bold">
+                                                            #{item.prioridade}
+                                                        </span>
+                                                        <span className="inline-block bg-green-100 text-green-800 text-xs px-2 py-1 rounded font-semibold">
+                                                            ✅ Priorizado
+                                                        </span>
+                                                    </div>
+                                                    <span className="font-semibold text-gray-900">{item.titulo}</span>
+                                                </div>
+                                                <div className="flex items-center gap-2 ml-4">
+                                                    {item.justificativa && (
+                                                        <button
+                                                            onClick={() => setViewingJustification(item)}
+                                                            className="text-gray-400 hover:text-blue-600 p-1 rounded hover:bg-blue-200 transition-colors"
+                                                            title="Ver Justificativa"
+                                                        >
+                                                            💬
+                                                        </button>
+                                                    )}
+                                                    <span className="text-sm font-semibold text-gray-700 bg-white px-2 py-1 rounded">
+                                                        ⏱️ {item.esforco_estimado}h
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <div className="mt-2 flex items-center gap-4 text-sm">
+                                                <span className="text-gray-600">📁 {item.area}</span>
+                                                <span className="text-gray-500">Score: {item.score.toFixed(1)}%</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        );
+                    })()}
+
+                    {/* Downstream Items */}
+                    {(() => {
+                        const downstreamItems = priorizados.filter(i => i.workflow_stage === 'downstream');
+                        if (downstreamItems.length === 0) return null;
+
+                        return (
+                            <div className="bg-white rounded-lg shadow-md border-l-4 border-green-500">
+                                <div className="bg-green-50 px-6 py-4 border-b border-green-100">
+                                    <h3 className="text-lg font-semibold text-green-900 flex items-center gap-2">
+                                        🔨 Downstream - Implementação
+                                        <span className="text-sm font-normal text-green-600">
+                                            ({downstreamItems.length} {downstreamItems.length === 1 ? 'item' : 'itens'})
+                                        </span>
+                                    </h3>
+                                    <p className="text-sm text-green-700 mt-1">
+                                        Desenvolvimento, integração e entrega
+                                    </p>
+                                </div>
+                                <div className="p-6 space-y-3 max-h-96 overflow-y-auto">
+                                    {downstreamItems.map((item) => (
+                                        <div key={item.id} className="border-l-4 border-green-400 bg-green-50 p-4 rounded-r hover:bg-green-100 transition-colors">
+                                            <div className="flex justify-between items-start">
+                                                <div className="flex-1">
+                                                    <div className="flex items-center gap-2 mb-2">
+                                                        <span className="inline-block bg-green-600 text-white text-xs px-2 py-1 rounded font-bold">
+                                                            #{item.prioridade}
+                                                        </span>
+                                                        <span className="inline-block bg-green-100 text-green-800 text-xs px-2 py-1 rounded font-semibold">
+                                                            ✅ Priorizado
+                                                        </span>
+                                                    </div>
+                                                    <span className="font-semibold text-gray-900">{item.titulo}</span>
+                                                </div>
+                                                <div className="flex items-center gap-2 ml-4">
+                                                    {item.justificativa && (
+                                                        <button
+                                                            onClick={() => setViewingJustification(item)}
+                                                            className="text-gray-400 hover:text-green-600 p-1 rounded hover:bg-green-200 transition-colors"
+                                                            title="Ver Justificativa"
+                                                        >
+                                                            💬
+                                                        </button>
+                                                    )}
+                                                    <span className="text-sm font-semibold text-gray-700 bg-white px-2 py-1 rounded">
+                                                        ⏱️ {item.esforco_estimado}h
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <div className="mt-2 flex items-center gap-4 text-sm">
+                                                <span className="text-gray-600">📁 {item.area}</span>
+                                                <span className="text-gray-500">Score: {item.score.toFixed(1)}%</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        );
+                    })()}
 
                     {/* Despriorizados */}
-                    <div className="bg-white rounded-lg shadow p-6">
-                        <h3 className="text-lg font-semibold mb-4 text-red-700">
-                            ❌ Despriorizados ({despriorizados.length})
-                        </h3>
-                        <div className="space-y-3 max-h-96 overflow-y-auto">
+                    <div className="bg-white rounded-lg shadow-md border-l-4 border-red-500">
+                        <div className="bg-red-50 px-6 py-4 border-b border-red-100">
+                            <h3 className="text-lg font-semibold text-red-900 flex items-center gap-2">
+                                ❌ Despriorizados
+                                <span className="text-sm font-normal text-red-600">
+                                    ({despriorizados.length} {despriorizados.length === 1 ? 'item' : 'itens'})
+                                </span>
+                            </h3>
+                            <p className="text-sm text-red-700 mt-1">
+                                Itens que não cabem na capacidade do trimestre
+                            </p>
+                        </div>
+                        <div className="p-6 space-y-3 max-h-96 overflow-y-auto">
                             {despriorizados.map((item) => (
-                                <div key={item.id} className="border-l-4 border-red-500 bg-red-50 p-3 rounded">
+                                <div key={item.id} className="border-l-4 border-red-400 bg-red-50 p-4 rounded-r hover:bg-red-100 transition-colors">
                                     <div className="flex justify-between items-start">
                                         <div className="flex-1">
-                                            <span className="inline-block bg-red-600 text-white text-xs px-2 py-1 rounded mr-2">
-                                                #{item.prioridade}
-                                            </span>
-                                            <span className="font-semibold">{item.titulo}</span>
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <span className="inline-block bg-red-600 text-white text-xs px-2 py-1 rounded font-bold">
+                                                    #{item.prioridade}
+                                                </span>
+                                                {item.workflow_stage && (
+                                                    <span className={`inline-block text-xs px-2 py-1 rounded font-semibold ${item.workflow_stage === 'upstream' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'
+                                                        }`}>
+                                                        {item.workflow_stage === 'upstream' ? '📋 Upstream' : '🔨 Downstream'}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <span className="font-semibold text-gray-900">{item.titulo}</span>
                                         </div>
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-2 ml-4">
                                             {item.justificativa && (
                                                 <button
                                                     onClick={() => setViewingJustification(item)}
-                                                    className="text-gray-400 hover:text-blue-600 p-1 rounded hover:bg-blue-50 transition-colors"
+                                                    className="text-gray-400 hover:text-red-600 p-1 rounded hover:bg-red-200 transition-colors"
                                                     title="Ver Justificativa"
                                                 >
                                                     💬
                                                 </button>
                                             )}
-                                            <span className="text-sm text-gray-600">{item.esforco_estimado}h</span>
+                                            <span className="text-sm font-semibold text-gray-700 bg-white px-2 py-1 rounded">
+                                                ⏱️ {item.esforco_estimado}h
+                                            </span>
                                         </div>
                                     </div>
-                                    <p className="text-sm text-gray-600 mt-1">{item.area}</p>
-                                    <p className="text-sm text-gray-500 mt-1">Score: {item.score.toFixed(1)}%</p>
+                                    <div className="mt-2 flex items-center gap-4 text-sm">
+                                        <span className="text-gray-600">📁 {item.area}</span>
+                                        <span className="text-gray-500">Score: {item.score.toFixed(1)}%</span>
+                                    </div>
                                 </div>
                             ))}
                         </div>

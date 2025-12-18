@@ -58,16 +58,43 @@ Write-Host "Building Docker Image..."
 
 # Generate Version (Timestamp)
 $VERSION_DATE = Get-Date -Format "yyyyMMdd.HHmm"
-Write-Host "Injecting Version: $VERSION_DATE-DEV"
-Set-Content -Path "app/version.txt" -Value "$VERSION_DATE-DEV"
+$VERSION_STRING = "$VERSION_DATE-DEV-FIXED"
+Write-Host "Injecting Version: $VERSION_STRING"
 
-# Build
-docker build --provenance=false --platform linux/amd64 -f Dockerfile.lambda -t $ECR_REPO_NAME .
+# Force delete and recreate to ensure sync
+if (Test-Path "app/version.txt") { Remove-Item "app/version.txt" -Force }
+Start-Sleep -Seconds 1
+Set-Content -Path "app/version.txt" -Value $VERSION_STRING
+Start-Sleep -Seconds 2
+
+# Verify content
+$CHECK_CONTENT = Get-Content "app/version.txt"
+Write-Host "VERIFYING FILE CONTENT BEFORE BUILD: $CHECK_CONTENT"
+
+# Build with --no-cache
+Write-Host "Starting Docker build..."
+docker build --no-cache --provenance=false --platform linux/amd64 -f Dockerfile.lambda -t $ECR_REPO_NAME .
+
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "Docker build failed with exit code $LASTEXITCODE"
+    exit 1
+}
+Write-Host "Docker build completed successfully"
 
 # 5. Tag and Push
 Write-Host "Pushing Image to ECR..."
 docker tag $ECR_REPO_NAME`:$IMAGE_TAG $FULL_IMAGE_URI
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "Docker tag failed with exit code $LASTEXITCODE"
+    exit 1
+}
+
 docker push $FULL_IMAGE_URI
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "Docker push failed with exit code $LASTEXITCODE"
+    exit 1
+}
+Write-Host "Image pushed successfully to ECR"
 
 # 6. Create or Update Lambda
 Write-Host "Updating Lambda Function..."
@@ -94,3 +121,4 @@ else {
 }
 
 Write-Host "Success! DEV Environment Deployed."
+Write-Host "Lambda Function URL: https://4tgupu7jynssz7q4ivevmdmsau0hyxjd.lambda-url.us-east-1.on.aws/"

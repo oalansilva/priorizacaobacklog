@@ -6,8 +6,18 @@ import json
 from typing import List, Mapping, Any
 
 
-def build_system_prompt(capacidade_total: float, weights: Mapping[str, int] = None) -> str:
-    """Retorna o prompt de sistema com instruções estratégicas."""
+def build_system_prompt(
+    capacidade_total: float, 
+    weights: Mapping[str, int] = None,
+    workflow_stage: str = None
+) -> str:
+    """Retorna o prompt de sistema com instruções estratégicas.
+    
+    Args:
+        capacidade_total: Capacidade disponível em horas
+        weights: Pesos para cada critério de priorização
+        workflow_stage: Estágio do workflow (upstream/downstream/sustentacao)
+    """
 
     weights_text = ""
     if weights:
@@ -18,8 +28,41 @@ def build_system_prompt(capacidade_total: float, weights: Mapping[str, int] = No
         weights_text += f"- OKR: {weights.get('peso_okr', 25)}%\n"
         weights_text += "Itens com critérios de maior peso devem ter preferência na lista.\n"
         weights_text += "IMPORTANTE: O campo 'estimado_qp' é apenas informativo (indica se o item foi estimado no Quarter Planning) e NÃO deve influenciar a priorização."
+    
+    # Workflow stage context
+    stage_context = ""
+    if workflow_stage:
+        stage_descriptions = {
+            "upstream": """\n\n📋 **CONTEXTO: ESTÁGIO UPSTREAM**
+Você está priorizando itens de **Upstream** (descoberta, pesquisa, design, análise).
+Estes itens focam em:
+- Descoberta e validação de problemas
+- Pesquisa de mercado e usuários
+- Design de soluções e protótipos
+- Análise técnica e viabilidade
+- Planejamento e especificação
 
-    return f"""Você é um experiente Product Manager (PM). Sua tarefa é priorizar itens de backlog para um trimestre com **{capacidade_total} horas** disponíveis para iniciativas.
+Itens Upstream geralmente precedem a implementação (Downstream).""",
+            "downstream": """\n\n🔨 **CONTEXTO: ESTÁGIO DOWNSTREAM**
+Você está priorizando itens de **Downstream** (implementação e entrega).
+Estes itens focam em:
+- Desenvolvimento de features
+- Implementação técnica
+- Integração de sistemas
+- Deploy e lançamento
+- Entrega de valor ao cliente
+
+NOTA: Idealmente, itens Downstream devem ter passado por Upstream primeiro."""
+        }
+        stage_context = stage_descriptions.get(workflow_stage, "")
+    
+    # Explanation about capacity (already discounted sustentacao)
+    capacity_note = f"""\n\n⚠️ **IMPORTANTE SOBRE CAPACIDADE**: 
+A capacidade informada ({capacidade_total} horas) JÁ DESCONTOU a reserva de sustentação 
+(bugs, hotfixes, suporte técnico não planejado). Você deve priorizar APENAS itens 
+planejados (Upstream ou Downstream) dentro desta capacidade disponível."""
+
+    return f"""Você é um experiente Product Manager (PM). Sua tarefa é priorizar itens de backlog para um trimestre com **{capacidade_total} horas** disponíveis para iniciativas.{capacity_note}{stage_context}
 
 **IMPORTANTE**: Você deve decidir quais itens cabem dentro da capacidade e atribuir o status correspondente.
 

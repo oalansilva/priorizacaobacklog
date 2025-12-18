@@ -68,16 +68,80 @@ function SetupPanel() {
                         <p className="text-sm text-gray-500 mt-1">Total de horas disponíveis para desenvolvimento no período.</p>
                     </div>
 
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Reserva para Sustentação (%)</label>
-                        <input
-                            type="number"
-                            name="percentual_sustentacao"
-                            value={settings.percentual_sustentacao}
-                            onChange={handleSettingChange}
-                            className="w-full border rounded-lg p-3 text-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-                        />
-                        <p className="text-sm text-gray-500 mt-1">Percentual da capacidade reservado para bugs e manutenção.</p>
+                    <div className="border-t pt-6">
+                        <h3 className="text-lg font-medium text-gray-900 mb-4">
+                            Alocação de Capacidade por Workflow Stage
+                            <span className={`ml-2 text-sm ${Math.abs(((settings.capacity_upstream_percent || 0) +
+                                (settings.capacity_downstream_percent || 0) +
+                                (settings.capacity_sustentacao_percent || 0)) - 100) < 0.01
+                                ? 'text-green-600' : 'text-red-500'
+                                }`}>
+                                (Soma: {((settings.capacity_upstream_percent || 0) +
+                                    (settings.capacity_downstream_percent || 0) +
+                                    (settings.capacity_sustentacao_percent || 0)).toFixed(1)}%)
+                            </span>
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-blue-700 mb-1 flex items-center gap-1">
+                                    📋 Upstream (%)
+                                </label>
+                                <input
+                                    type="number"
+                                    name="capacity_upstream_percent"
+                                    value={settings.capacity_upstream_percent || 40}
+                                    onChange={(e) => {
+                                        const value = parseFloat(e.target.value) || 0;
+                                        setSettings(prev => ({ ...prev, capacity_upstream_percent: value }));
+                                        setSaved(false);
+                                    }}
+                                    step="0.1"
+                                    className="w-full border border-blue-200 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 outline-none"
+                                />
+                                <p className="text-xs text-gray-500 mt-1">Descoberta, pesquisa, design</p>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-green-700 mb-1 flex items-center gap-1">
+                                    🔨 Downstream (%)
+                                </label>
+                                <input
+                                    type="number"
+                                    name="capacity_downstream_percent"
+                                    value={settings.capacity_downstream_percent || 40}
+                                    onChange={(e) => {
+                                        const value = parseFloat(e.target.value) || 0;
+                                        setSettings(prev => ({ ...prev, capacity_downstream_percent: value }));
+                                        setSaved(false);
+                                    }}
+                                    step="0.1"
+                                    className="w-full border border-green-200 rounded-lg p-2 focus:ring-2 focus:ring-green-500 outline-none"
+                                />
+                                <p className="text-xs text-gray-500 mt-1">Implementação, entrega</p>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-orange-700 mb-1 flex items-center gap-1">
+                                    🔧 Sustentação (%)
+                                </label>
+                                <input
+                                    type="number"
+                                    name="capacity_sustentacao_percent"
+                                    value={settings.capacity_sustentacao_percent || 20}
+                                    onChange={(e) => {
+                                        const value = parseFloat(e.target.value) || 0;
+                                        setSettings(prev => ({ ...prev, capacity_sustentacao_percent: value }));
+                                        setSaved(false);
+                                    }}
+                                    step="0.1"
+                                    className="w-full border border-orange-200 rounded-lg p-2 focus:ring-2 focus:ring-orange-500 outline-none"
+                                />
+                                <p className="text-xs text-gray-500 mt-1">Bugs, manutenção, suporte</p>
+                            </div>
+                        </div>
+                        {Math.abs(((settings.capacity_upstream_percent || 0) +
+                            (settings.capacity_downstream_percent || 0) +
+                            (settings.capacity_sustentacao_percent || 0)) - 100) >= 0.01 && (
+                                <p className="text-red-500 text-sm mt-2">⚠️ A soma dos percentuais deve ser exatamente 100%.</p>
+                            )}
                     </div>
 
                     <div className="border-t pt-6">

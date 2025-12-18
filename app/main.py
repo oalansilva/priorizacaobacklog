@@ -341,7 +341,8 @@ def execute_prioritization(
                 impacto_cliente=item.impacto_cliente,
                 okr=item.okr,
                 must_have=item.must_have,
-                justificativa=item.justificativa
+                justificativa=item.justificativa,
+                workflow_stage=item.workflow_stage
             ))
         
         logger.info("roadmap_items_created", count=len(roadmap_items))

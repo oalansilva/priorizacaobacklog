@@ -10,6 +10,9 @@ function App() {
     const [version, setVersion] = useState('');
 
     React.useEffect(() => {
+        // Enforce Lambda Function URL
+        axios.defaults.baseURL = 'https://4tgupu7jynssz7q4ivevmdmsau0hyxjd.lambda-url.us-east-1.on.aws/';
+
         fetch('version')
             .then(res => res.json())
             .then(data => setVersion(data.version))

@@ -80,20 +80,21 @@ def export_roadmap_to_pdf(roadmap: Roadmap) -> BytesIO:
         priorizados = [item for item in roadmap.itens if item.status == "Priorizado"]
         priorizados.sort(key=lambda x: x.prioridade if x.prioridade else 999)
         
-        logger.info(f"Processando {len(priorizados)} itens priorizados")
+        upstream_items = [i for i in priorizados if i.workflow_stage == 'upstream']
+        downstream_items = [i for i in priorizados if i.workflow_stage == 'downstream']
         
-        if priorizados:
-            elements.append(Paragraph(f"<b>Priorizados ({len(priorizados)})</b>", styles['Heading2']))
+        logger.info(f"Processando {len(priorizados)} itens priorizados ({len(upstream_items)} upstream, {len(downstream_items)} downstream)")
+        
+        # === SEÇÃO UPSTREAM ===
+        if upstream_items:
+            elements.append(Paragraph(f"<b>Upstream - Descoberta e Design ({len(upstream_items)})</b>", styles['Heading2']))
             elements.append(Spacer(1, 0.1*inch))
             
-            # Tabela simplificada
             data = [['#', 'Titulo', 'Area', 'Horas', 'Score']]
-            
-            for item in priorizados:
+            for item in upstream_items:
                 titulo = clean_text(item.titulo)[:50]
                 area = clean_text(item.area)[:20]
                 score = item.score if item.score is not None else 0.0
-                
                 data.append([
                     f"#{item.prioridade or ''}",
                     titulo,
@@ -104,16 +105,47 @@ def export_roadmap_to_pdf(roadmap: Roadmap) -> BytesIO:
             
             table = Table(data, colWidths=[0.5*inch, 3*inch, 1.5*inch, 0.8*inch, 0.8*inch])
             table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.green),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#3B82F6')), # Blue-500
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                 ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
                 ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
                 ('FONTSIZE', (0, 0), (-1, 0), 10),
                 ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#EFF6FF')), # Blue-50
                 ('GRID', (0, 0), (-1, -1), 1, colors.black)
             ]))
+            elements.append(table)
+            elements.append(Spacer(1, 0.3*inch))
+
+        # === SEÇÃO DOWNSTREAM ===
+        if downstream_items:
+            elements.append(Paragraph(f"<b>Downstream - Implementação ({len(downstream_items)})</b>", styles['Heading2']))
+            elements.append(Spacer(1, 0.1*inch))
             
+            data = [['#', 'Titulo', 'Area', 'Horas', 'Score']]
+            for item in downstream_items:
+                titulo = clean_text(item.titulo)[:50]
+                area = clean_text(item.area)[:20]
+                score = item.score if item.score is not None else 0.0
+                data.append([
+                    f"#{item.prioridade or ''}",
+                    titulo,
+                    area,
+                    f"{item.esforco_estimado or 0}h",
+                    f"{score:.1f}%"
+                ])
+            
+            table = Table(data, colWidths=[0.5*inch, 3*inch, 1.5*inch, 0.8*inch, 0.8*inch])
+            table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#10B981')), # Green-500
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#F0FDF4')), # Green-50
+                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+            ]))
             elements.append(table)
             elements.append(Spacer(1, 0.3*inch))
         

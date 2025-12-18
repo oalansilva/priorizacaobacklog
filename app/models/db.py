@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from typing import Optional, List
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator, field_validator
 import uuid
 
 class User(BaseModel):
@@ -31,9 +31,26 @@ class BacklogItem(BaseModel):
     okr: str = "Não"  # Sim/Não
     must_have: str = "Não"  # Sim/Não - Item obrigatório para priorização
     estimado_qp: str = "Não"  # Sim/Não (apenas informativo)
-    estimado_qp: str = "Não"  # Sim/Não (apenas informativo)
     justificativa: Optional[str] = None
     user_id: Optional[str] = None  # Dono do item
+    
+    # Workflow stage tracking
+    workflow_stage: str = "upstream"  # "upstream" | "downstream" (sustentacao is NOT a valid stage)
+    upstream_completed_at: Optional[str] = None  # ISO 8601 timestamp
+    
+    @field_validator('workflow_stage')
+    @classmethod
+    def validate_workflow_stage(cls, v: str) -> str:
+        """Validate that workflow_stage is only upstream or downstream.
+        
+        Sustentacao is NOT a workflow stage - it's a capacity reservation for unplanned work.
+        """
+        if v not in ["upstream", "downstream"]:
+            raise ValueError(
+                f"workflow_stage must be 'upstream' or 'downstream', got '{v}'. "
+                "Sustentacao is not a valid workflow stage - it's only a capacity reservation."
+            )
+        return v
 
 
 class ConversationMessage(BaseModel):
@@ -59,10 +76,28 @@ class SystemSettings(BaseModel):
     updated_at: Optional[str] = Field(default_factory=lambda: datetime.now().isoformat())
     user_id: Optional[str] = None  # Configurações do usuário (se None, usa global/default)
     
+    # Workflow stage capacity allocation (percentages)
+    capacity_upstream_percent: float = 40.0
+    capacity_downstream_percent: float = 40.0
+    capacity_sustentacao_percent: float = 20.0
+    
     # Status de priorização assíncrona
     last_prioritization_status: Optional[str] = None  # "running", "completed", "error"
     last_prioritization_message: Optional[str] = None
     last_prioritization_time: Optional[str] = None
+    
+    @validator('capacity_sustentacao_percent')
+    def validate_capacity_sum(cls, v, values):
+        """Ensure capacity percentages sum to 100%."""
+        upstream = values.get('capacity_upstream_percent', 0)
+        downstream = values.get('capacity_downstream_percent', 0)
+        total = upstream + downstream + v
+        if abs(total - 100.0) > 0.01:  # Allow small floating point errors
+            raise ValueError(
+                f"Capacity percentages must sum to 100%, got {total}% "
+                f"(upstream: {upstream}%, downstream: {downstream}%, sustentacao: {v}%)"
+            )
+        return v
 
 
 class RoadmapItem(BaseModel):
@@ -82,6 +117,8 @@ class RoadmapItem(BaseModel):
     okr: str = "Não"
     must_have: str = "Não"
     justificativa: Optional[str] = None
+    workflow_stage: str = "upstream"  # Workflow stage at time of prioritization
+    upstream_completed_at: Optional[str] = None
 
 
 class Roadmap(BaseModel):
@@ -94,6 +131,11 @@ class Roadmap(BaseModel):
     capacidade_total: int
     percentual_sustentacao: int
     capacidade_iniciativas: int
+    
+    # Workflow stage capacity allocation (snapshot at time of creation)
+    capacity_upstream_percent: float = 40.0
+    capacity_downstream_percent: float = 40.0
+    capacity_sustentacao_percent: float = 20.0
     
     # Métricas
     total_itens: int

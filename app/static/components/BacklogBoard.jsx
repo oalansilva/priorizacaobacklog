@@ -302,6 +302,14 @@ function BacklogBoard() {
                                     </div>
 
                                     <div className="flex flex-wrap gap-1 sm:gap-1.5">
+                                        {/* Workflow Stage Badge */}
+                                        {item.workflow_stage && (
+                                            <span className={`px-1.5 py-0.5 rounded text-xs font-medium border ${item.workflow_stage === 'upstream' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                                                    'bg-green-50 text-green-700 border-green-200'
+                                                }`}>
+                                                {item.workflow_stage === 'upstream' ? '📋 Upstream' : '🔨 Downstream'}
+                                            </span>
+                                        )}
                                         {item.impacto_financeiro === 'Sim' && (
                                             <span className="px-1.5 py-0.5 bg-green-50 text-green-700 rounded text-xs font-medium">💰 Financeiro</span>
                                         )}

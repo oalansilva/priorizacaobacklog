@@ -50,17 +50,45 @@ def export_roadmap_to_csv(roadmap: Roadmap) -> str:
     writer.writerow([])
     
     # === SEÇÃO PRIORIZADOS ===
-    writer.writerow(['ITENS PRIORIZADOS'])
-    writer.writerow(['#', 'Título', 'Área', 'Esforço (h)', 'Score', 'Impacto Fin.', 'Impacto Neg.', 'Impacto Cli.', 'OKR', 'Must Have', 'Justificativa'])
+    # === SEÇÃO UPSTREAM ===
+    writer.writerow(['ITENS PRIORIZADOS - UPSTREAM'])
+    writer.writerow(['#', 'Título', 'Workflow', 'Área', 'Esforço (h)', 'Score', 'Impacto Fin.', 'Impacto Neg.', 'Impacto Cli.', 'OKR', 'Must Have', 'Justificativa'])
     
     priorizados = [item for item in roadmap.itens if item.status == "Priorizado"]
     priorizados.sort(key=lambda x: x.prioridade if x.prioridade else 999)
     
-    for item in priorizados:
+    upstream_items = [i for i in priorizados if i.workflow_stage == 'upstream']
+    downstream_items = [i for i in priorizados if i.workflow_stage == 'downstream']
+    
+    for item in upstream_items:
         score_value = item.score if item.score is not None else 0.0
         writer.writerow([
             item.prioridade or '',
             item.titulo or '',
+            'Upstream',
+            item.area or '',
+            item.esforco_estimado or 0,
+            f'{score_value:.1f}%',
+            item.impacto_financeiro or 'Não',
+            item.impacto_negocios or 'Não',
+            item.impacto_cliente or 'Não',
+            item.okr or 'Não',
+            item.must_have or 'Não',
+            item.justificativa or ''
+        ])
+    
+    writer.writerow([])
+    
+    # === SEÇÃO DOWNSTREAM ===
+    writer.writerow(['ITENS PRIORIZADOS - DOWNSTREAM'])
+    writer.writerow(['#', 'Título', 'Workflow', 'Área', 'Esforço (h)', 'Score', 'Impacto Fin.', 'Impacto Neg.', 'Impacto Cli.', 'OKR', 'Must Have', 'Justificativa'])
+
+    for item in downstream_items:
+        score_value = item.score if item.score is not None else 0.0
+        writer.writerow([
+            item.prioridade or '',
+            item.titulo or '',
+            'Downstream',
             item.area or '',
             item.esforco_estimado or 0,
             f'{score_value:.1f}%',

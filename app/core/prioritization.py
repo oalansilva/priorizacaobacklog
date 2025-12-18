@@ -53,21 +53,24 @@ class PrioritizationService:
         """Executa todo o fluxo para um DataFrame."""
 
         capacidade = capacidade_total or self.settings.default_capacidade_total
-        percentual = (
-            percentual_sustentacao or self.settings.default_percentual_sustentacao
-        )
+        
+        # Get capacity allocation from database (new unified system)
+        from app.core.database import get_repository
+        repo = get_repository()
+        db_settings = repo.get_settings()
+        capacity_sustentacao_percent = db_settings.capacity_sustentacao_percent
 
         cleaned = self._clean_dataframe(dataframe)
         if cleaned.empty:
             raise ValueError("DataFrame fornecido está vazio após limpeza.")
 
         capacidade_iniciativas = self._calcular_capacidade_iniciativas(
-            capacidade, percentual
+            capacidade, capacity_sustentacao_percent
         )
         self.logger.debug(
             "process_dataframe.start",
             capacidade_total=capacidade,
-            percentual_sustentacao=percentual,
+            capacity_sustentacao_percent=capacity_sustentacao_percent,
             capacidade_iniciativas=capacidade_iniciativas,
             itens=len(cleaned),
         )
@@ -169,13 +172,25 @@ class PrioritizationService:
         return df
 
     def _calcular_capacidade_iniciativas(
-        self, capacidade_total: int, percentual_sustentacao: int
+        self, capacidade_total: int, capacity_sustentacao_percent: float
     ) -> float:
-        sustentacao = (capacidade_total * percentual_sustentacao) / 100
+        """Calculate available capacity for planned initiatives.
+        
+        Uses the new unified capacity allocation system.
+        Sustentacao is now part of the 3-stage allocation (upstream/downstream/sustentacao).
+        
+        Args:
+            capacidade_total: Total capacity in hours
+            capacity_sustentacao_percent: Percentage reserved for sustentacao (buffer)
+            
+        Returns:
+            Available capacity for planned PBIs (upstream + downstream)
+        """
+        sustentacao = (capacidade_total * capacity_sustentacao_percent) / 100
         return float(capacidade_total - sustentacao)
 
     def _obter_priorizacao_da_ia(
-        self, df: pd.DataFrame, capacidade_iniciativas: float
+        self, df: pd.DataFrame, capacidade_iniciativas: float, workflow_stage: str = None
     ) -> pd.DataFrame:
         lista = df.to_dict(orient="records")
         from app.core.database import get_repository
@@ -189,7 +204,7 @@ class PrioritizationService:
         if not weights.get('peso_financeiro'):
              weights.update(self.settings.model_dump())
 
-        system_message = SystemMessage(build_system_prompt(capacidade_iniciativas, weights))
+        system_message = SystemMessage(build_system_prompt(capacidade_iniciativas, weights, workflow_stage))
         human_message = HumanMessage(build_human_prompt(lista, capacidade_iniciativas))
 
         messages = [system_message, human_message]

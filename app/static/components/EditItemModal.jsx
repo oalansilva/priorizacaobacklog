@@ -50,6 +50,13 @@ function EditItemModal({ item, onClose, onSave }) {
                                 <option value="Despriorizado">Despriorizado</option>
                             </select>
                         </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Workflow Stage</label>
+                            <select name="workflow_stage" value={formData.workflow_stage || 'upstream'} onChange={handleChange} className="mt-1 w-full border rounded p-2">
+                                <option value="upstream">📋 Upstream</option>
+                                <option value="downstream">🔨 Downstream</option>
+                            </select>
+                        </div>
                     </div>
 
                     <div className="border-t pt-4">
