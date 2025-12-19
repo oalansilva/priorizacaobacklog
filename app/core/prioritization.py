@@ -70,6 +70,11 @@ class PrioritizationService:
             capacidade, capacity_sustentacao_percent
         )
         
+        # Calculate scores BEFORE LLM for better decision making
+        cleaned = self._calcular_scores_dataframe(cleaned)
+        
+        # Calculate specific limits for workflow stages
+        
         # Calculate specific limits for workflow stages
         upstream_limit = int(capacidade * (capacity_upstream_percent / 100))
         downstream_limit = int(capacidade * (capacity_downstream_percent / 100))
@@ -142,7 +147,10 @@ class PrioritizationService:
                 estimado_qp=row.get("estimado_qp"),
                 categoria=row.get("categoria"),
                 area=row.get("area"),
-                outros_dados={"score": float(row.get("score", 0.0))},
+                outros_dados={
+                    "score": float(row.get("score", 0.0)),
+                    "workflow_stage": row.get("workflow_stage")
+                },
             )
             for _, row in priorizado.iterrows()
         ]
@@ -235,6 +243,10 @@ class PrioritizationService:
         # Fallback para self.settings se valores forem None (embora o DB deva ter defaults)
         if not weights.get('peso_financeiro'):
              weights.update(self.settings.model_dump())
+
+        # Ensure 'score' is in the dictionary passed to prompts
+        # The dataframe already has it calculated from _calcular_scores_dataframe
+        lista = df.to_dict(orient="records")
 
         system_message = SystemMessage(build_system_prompt(capacidade_iniciativas, weights, workflow_stage))
         human_message = HumanMessage(build_human_prompt(lista, capacidade_iniciativas))
@@ -461,43 +473,22 @@ class PrioritizationService:
             prioridades_despriorizados=df.loc[~mask_priorizado, "prioridade"].tolist() if (~mask_priorizado).sum() > 0 else []
         )
         
-        # Calcular Score
-        # Obter pesos atuais (já carregados em 'weights' no método anterior, mas precisamos aqui também)
-        # Como _aplicar_status_e_prioridade é chamado após _obter_priorizacao_da_ia, podemos recalcular ou passar os pesos.
-        # Para simplificar, vamos buscar novamente do banco ou usar defaults
+        # Score já foi calculado antes da LLM, mas recalculamos aqui para garantir consistência
+        # e caso a LLM tenha alterado algo (improvável, mas seguro)
         from app.core.database import get_repository
         repo = get_repository()
         db_settings = repo.get_settings()
         
-        peso_fin = db_settings.peso_financeiro
-        peso_neg = db_settings.peso_negocios
-        peso_cli = db_settings.peso_cliente
-        peso_okr = db_settings.peso_okr
-        total_pesos = peso_fin + peso_neg + peso_cli + peso_okr
+        # ... (rest of caching logic redundant if we use the helper)
+        # Instead of redefining, we can just call the helper again or verify.
+        # For safety/simplicity, let's just ensure it's there. 
+        # If the LLM dropped the column (it shouldn't as we parse specific response fields), 
+        # we restore it from the clean dataframe logic? 
+        # Ideally, 'priorizado' dataframe comes from _parse_llm_response which creates a new DF from JSON.
+        # So yes, we MUST recalculate it here because the JSON response likely doesn't include the score 
+        # (unless we ask LLM to return it, which costs tokens).
         
-        def calcular_score(row):
-            # 1. Must Have = 100%
-            if "must_have" in row and str(row["must_have"]).lower() == "sim":
-                return 100.0
-            
-            # 2. Calcular com base nos pesos
-            score = 0.0
-            
-            # Helper para converter Sim/Não em 1/0
-            def val(col):
-                v = str(row.get(col, "não")).lower()
-                return 1.0 if v == "sim" else 0.0
-            
-            if total_pesos > 0:
-                score += val("financeiro") * peso_fin
-                score += val("negocio") * peso_neg
-                score += val("cliente") * peso_cli
-                score += val("okr") * peso_okr
-                score = (score / total_pesos) * 100.0
-            
-            return round(score, 1)
-
-        df["score"] = df.apply(calcular_score, axis=1)
+        df = self._calcular_scores_dataframe(df)
 
         return df
 
@@ -678,3 +669,44 @@ class PrioritizationService:
         return df
 
 
+        return df
+
+    def _calcular_scores_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Calcula o Score de cada item no DataFrame baseado nos pesos."""
+        df = df.copy()
+        
+        from app.core.database import get_repository
+        repo = get_repository()
+        db_settings = repo.get_settings()
+        
+        peso_fin = db_settings.peso_financeiro
+        peso_neg = db_settings.peso_negocios
+        peso_cli = db_settings.peso_cliente
+        peso_okr = db_settings.peso_okr
+        total_pesos = peso_fin + peso_neg + peso_cli + peso_okr
+        
+        def calcular_score(row):
+            # 1. Must Have = 100%
+            if "must_have" in row and str(row["must_have"]).lower() == "sim":
+                return 100.0
+            
+            # 2. Calcular com base nos pesos
+            score = 0.0
+            
+            # Helper para converter Sim/Não em 1/0
+            def val(col):
+                v = str(row.get(col, "não")).lower()
+                return 1.0 if v == "sim" else 0.0
+            
+            if total_pesos > 0:
+                score += val("financeiro") * peso_fin
+                score += val("negocio") * peso_neg
+                score += val("cliente") * peso_cli
+                score += val("okr") * peso_okr
+                score = (score / total_pesos) * 100.0
+            
+            return round(score, 1)
+
+        # Apply calculation
+        df["score"] = df.apply(calcular_score, axis=1)
+        return df

@@ -63,16 +63,24 @@ NOTA: Idealmente, itens Downstream devem ter passado por Upstream primeiro."""
         downstream_limit = workflow_stage.get('downstream_limit', 0)
         
         capacity_note = f"""\n\n⚠️ **IMPORTANTE SOBRE CAPACIDADE POR ESTÁGIO**:
-Você deve respeitar ESTRITAMENTE os limites individuais para cada estágio do workflow:
 
-1. **UPSTREAM (Descoberta/Design)**: Limite MÁXIMO de **{upstream_limit} horas**.
-   - A soma das horas dos itens Upstream priorizados NÃO pode exceder {upstream_limit}h.
+Você DEVE respeitar os seguintes limites INDIVIDUAIS para cada estágio:
+
+1. **UPSTREAM (Descoberta/Design)**: MÁXIMO **{upstream_limit} horas**
+   - A soma total das horas de TODOS os itens Upstream com status="Priorizado" NÃO pode exceder {upstream_limit}h
+   - Exemplo: Se você priorizar 3 itens Upstream de 20h, 30h e 25h, o total é 75h
+   - Se 75h > {upstream_limit}h, você DEVE despriorizar itens até caber no limite
    
-2. **DOWNSTREAM (Implementação)**: Limite MÁXIMO de **{downstream_limit} horas**.
-   - A soma das horas dos itens Downstream priorizados NÃO pode exceder {downstream_limit}h.
+2. **DOWNSTREAM (Implementação)**: MÁXIMO **{downstream_limit} horas**
+   - A soma total das horas de TODOS os itens Downstream com status="Priorizado" NÃO pode exceder {downstream_limit}h
+   - Exemplo: Se você priorizar 5 itens Downstream totalizando 550h e o limite é {downstream_limit}h
+   - Se 550h > {downstream_limit}h, você DEVE despriorizar itens até caber no limite
 
-Capacidade TOTAL combinada: {capacidade_total} horas.
-A priorização deve respeitar AMBOS os limites individuais e o total."""
+**IMPORTANTE**: 
+- Estes limites são INDEPENDENTES - você deve verificar AMBOS separadamente
+- Um item Upstream NÃO consome capacidade Downstream e vice-versa
+- Capacidade total combinada: {capacidade_total}h
+- Antes de finalizar, SOME as horas de cada estágio e VERIFIQUE se respeitou os limites"""
     else:
         # Legacy behavior or single stage
         capacity_note = f"""\n\n⚠️ **IMPORTANTE SOBRE CAPACIDADE**: 
@@ -121,6 +129,9 @@ IMPORTANTE: Retorne APENAS o JSON array. Use chaves em minúsculas. Mantenha os 
    - Itens que não cabem devem ter status="Despriorizado"
 
 **3. CRITÉRIOS DE VALOR** (para itens NÃO-Must Have):{weights_text}
+   - **SCORE (Alta Importância)**: O campo 'score' (0-100) já foi calculado baseado nos pesos acima.
+     - Itens com MAIOR score devem ter PREFERÊNCIA.
+     - Exemplo: Um item com score 60.0 deve ser priorizado antes de um com 25.0, a menos que o menor seja pré-requisito técnico.
    - Amplitude de Valor: Itens que impactam Cliente, Negócio e Financeiro
    - Alinhamento com OKR: Contribuição para objetivos estratégicos
    - Custo-Benefício: Pondere esforço vs impacto

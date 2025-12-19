@@ -35,12 +35,24 @@ try:
     result = execute_prioritization(
         capacidade_total=None,
         percentual_sustentacao=None,
-        user_id="debug-user" # Or keep None if not using user isolation strictly locally
+        user_id=None # Get all items for debugging
     )
     
     print("\n✅ Prioritization Completed Successfully!")
     print(f"Total Items: {len(result.itens)}")
     print(f"Prioritized: {len([i for i in result.itens if i.status == 'Priorizado'])}")
+    
+    print("\n📝 Prioritized Items Details:")
+    for item in result.itens:
+        if item.status == "Priorizado":
+            print(f"- [{item.outros_dados.get('workflow_stage', 'N/A')}] {item.item} ({item.horas}h) [Score: {item.outros_dados.get('score')}%]")
+            print(f"  Justificativa: {item.justificativa}")
+            
+    print("\n❌ Desprioritized Upstream Items (Sample):")
+    for item in result.itens:
+        if item.status == "Despriorizado" and str(item.outros_dados.get('workflow_stage', '')).lower() == 'upstream':
+             print(f"- {item.item} ({item.horas}h) [Score: {item.outros_dados.get('score')}%]")
+             print(f"  Justificativa: {item.justificativa}")
 
 except Exception as e:
     print(f"\n❌ Prioritization Failed: {e}")
