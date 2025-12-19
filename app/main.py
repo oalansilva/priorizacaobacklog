@@ -206,6 +206,8 @@ def execute_prioritization(
             "categoria": item.categoria,
             "area": item.area,
             "estimado_qp": item.estimado_qp,
+            "workflow_stage": item.workflow_stage,
+            "upstream_completed_at": item.upstream_completed_at,
         })
     
     df = pd.DataFrame(items_dict)

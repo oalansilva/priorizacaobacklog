@@ -59,6 +59,8 @@ class PrioritizationService:
         repo = get_repository()
         db_settings = repo.get_settings()
         capacity_sustentacao_percent = db_settings.capacity_sustentacao_percent
+        capacity_upstream_percent = db_settings.capacity_upstream_percent
+        capacity_downstream_percent = db_settings.capacity_downstream_percent
 
         cleaned = self._clean_dataframe(dataframe)
         if cleaned.empty:
@@ -67,15 +69,45 @@ class PrioritizationService:
         capacidade_iniciativas = self._calcular_capacidade_iniciativas(
             capacidade, capacity_sustentacao_percent
         )
+        
+        # Calculate specific limits for workflow stages
+        upstream_limit = int(capacidade * (capacity_upstream_percent / 100))
+        downstream_limit = int(capacidade * (capacity_downstream_percent / 100))
+        
+        workflow_constraints = {
+            "upstream_limit": upstream_limit,
+            "downstream_limit": downstream_limit
+        }
+        
         self.logger.debug(
             "process_dataframe.start",
             capacidade_total=capacidade,
             capacity_sustentacao_percent=capacity_sustentacao_percent,
             capacidade_iniciativas=capacidade_iniciativas,
+            upstream_limit=upstream_limit,
+            downstream_limit=downstream_limit,
             itens=len(cleaned),
         )
 
-        priorizado = self._obter_priorizacao_da_ia(cleaned, capacidade_iniciativas)
+        # Pass limits dictionary as workflow_stage context
+        priorizado = self._obter_priorizacao_da_ia(cleaned, capacidade_iniciativas, workflow_stage=workflow_constraints)
+        
+        # Merge workflow_stage back from cleaned dataframe mapping by id
+        if "id" in priorizado.columns and "workflow_stage" not in priorizado.columns:
+            # Ensure IDs are strings for matching
+            cleaned["id"] = cleaned["id"].astype(str)
+            priorizado["id"] = priorizado["id"].astype(str)
+            
+            # Create a mapping of id -> workflow_stage
+            stage_map = dict(zip(cleaned["id"], cleaned["workflow_stage"]))
+            priorizado["workflow_stage"] = priorizado["id"].map(stage_map)
+            
+        # Enforce strict limits per stage
+        priorizado = self._aplicar_limites_por_estagio(priorizado, workflow_constraints)
+        
+        # Greedy Filler: Tentar preencher sobra de capacidade com itens que cabem
+        priorizado = self._preencher_lacunas_capacidade(priorizado, workflow_constraints)
+
         priorizado = self._aplicar_status_e_prioridade(
             priorizado, capacidade_iniciativas
         )
@@ -190,7 +222,7 @@ class PrioritizationService:
         return float(capacidade_total - sustentacao)
 
     def _obter_priorizacao_da_ia(
-        self, df: pd.DataFrame, capacidade_iniciativas: float, workflow_stage: str = None
+        self, df: pd.DataFrame, capacidade_iniciativas: float, workflow_stage: Any = None
     ) -> pd.DataFrame:
         lista = df.to_dict(orient="records")
         from app.core.database import get_repository
@@ -467,6 +499,182 @@ class PrioritizationService:
 
         df["score"] = df.apply(calcular_score, axis=1)
 
+        return df
+
+    def _aplicar_limites_por_estagio(
+        self, df: pd.DataFrame, limits: dict
+    ) -> pd.DataFrame:
+        """Força a aplicação estrita dos limites de capacidade por estágio."""
+        df = df.copy()
+        
+        # Converter coluna horas para numérico para garantir cálculos
+        if "horas" in df.columns:
+            df["horas"] = pd.to_numeric(df["horas"], errors="coerce").fillna(0)
+
+        stages_to_check = [
+            ("upstream", limits.get("upstream_limit", 0)),
+            ("downstream", limits.get("downstream_limit", 0))
+        ]
+
+        for stage, limit in stages_to_check:
+            if limit <= 0:
+                 continue
+                 
+            # Filtra itens deste estágio que estão priorizados
+            # Assumindo case-insensitive para workflow_stage
+            if "workflow_stage" not in df.columns:
+                continue
+                
+            mask_stage = (df["workflow_stage"].str.lower() == stage) & (df["status"] == "Priorizado")
+            
+            # Se não houver itens priorizados neste estágio, pula
+            if not mask_stage.any():
+                continue
+                
+            items_stage = df[mask_stage].copy()
+            total_horas = items_stage["horas"].sum()
+            
+            if total_horas > limit:
+                self.logger.warning(
+                    f"limit_exceeded_{stage}",
+                    total=total_horas,
+                    limit=limit,
+                    message=f"Limite de {stage} excedido ({total_horas}h > {limit}h). Aplicando correção forçada."
+                )
+                
+                # Identifica Must Have
+                mask_must_have = items_stage.get("must_have", pd.Series(["Não"] * len(items_stage))).str.lower() == "sim"
+                
+                must_have_items = items_stage[mask_must_have]
+                regular_items = items_stage[~mask_must_have]
+                
+                horas_must_have = must_have_items["horas"].sum()
+                capacity_remaining = limit - horas_must_have
+                
+                if capacity_remaining < 0:
+                   capacity_remaining = 0
+                   self.logger.warning(
+                       f"must_have_exceeded_{stage}",
+                       horas_must_have=horas_must_have,
+                       limit=limit, 
+                       message="Itens Must Have sozinhos já excedem o limite do estágio. Mantendo Must Haves e cortando todos regulares."
+                   )
+                
+                # Vamos manter os regulares que cabem, priorizando os que aparecem primeiro na lista
+                # (já que a ordem da lista geralmente reflete a prioridade do LLM)
+                
+                current_regular_hours = 0
+                ids_to_deprioritize = []
+                
+                for idx, row in regular_items.iterrows():
+                    item_hours = row["horas"]
+                    if current_regular_hours + item_hours <= capacity_remaining:
+                        current_regular_hours += item_hours
+                    else:
+                        ids_to_deprioritize.append(idx)
+                        
+                if ids_to_deprioritize:
+                    df.loc[ids_to_deprioritize, "status"] = "Despriorizado"
+                    
+                    # Atualiza justificativa
+                    justificativa_msg = f"[Automático: Excedeu limite de {stage} ({limit}h)]"
+                    
+                    # Se justificativa já existe, concatena. Se for None/NaN, define.
+                    if "justificativa" not in df.columns:
+                        df["justificativa"] = ""
+                        
+                    # Fix for filtering boolean series with list of indices
+                    mask_indices = df.index.isin(ids_to_deprioritize)
+                    
+                    # Apply justification only to existing empty justifications
+                    df.loc[mask_indices & df["justificativa"].isna(), "justificativa"] = justificativa_msg
+                    
+                    # Append to existing justifications
+                    mask_existing = mask_indices & df["justificativa"].notna()
+                    df.loc[mask_existing, "justificativa"] = df.loc[mask_existing, "justificativa"].astype(str) + " " + justificativa_msg
+                    
+                    self.logger.info(
+                        "stage_limit_corrected",
+                        stage=stage,
+                        limit=limit,
+                        deprioritized_count=len(ids_to_deprioritize),
+                        hours_cut=df.loc[ids_to_deprioritize, "horas"].sum()
+                    )
+
+        return df
+
+    def _preencher_lacunas_capacidade(
+        self, df: pd.DataFrame, limits: dict
+    ) -> pd.DataFrame:
+        """
+        Preenche a capacidade restante dos estágios com itens despriorizados que cabem (Greedy Filler).
+        """
+        df = df.copy()
+        
+        # Garantir numérico
+        if "horas" in df.columns:
+            df["horas"] = pd.to_numeric(df["horas"], errors="coerce").fillna(0)
+            
+        stages_to_check = [
+            ("upstream", limits.get("upstream_limit", 0)),
+            ("downstream", limits.get("downstream_limit", 0))
+        ]
+        
+        for stage, limit in stages_to_check:
+            if limit <= 0: continue
+            
+            if "workflow_stage" not in df.columns: continue
+            
+            # Calcular uso atual
+            mask_priorizado_stage = (df["workflow_stage"].str.lower() == stage) & (df["status"] == "Priorizado")
+            horas_usadas = df.loc[mask_priorizado_stage, "horas"].sum()
+            horas_restantes = limit - horas_usadas
+            
+            if horas_restantes <= 0: continue
+            
+            # Buscar candidatos despriorizados deste estágio
+            mask_candidatos = (df["workflow_stage"].str.lower() == stage) & (df["status"] == "Despriorizado")
+            candidatos = df[mask_candidatos].copy()
+            
+            # Se não houver candidatos, pula
+            if candidatos.empty: continue
+            
+            itens_promovidos = []
+            
+            # Itera na ordem original (que presumivelmente reflete a prioridade relativa dada pela IA)
+            for idx, row in candidatos.iterrows():
+                if row["horas"] <= horas_restantes:
+                    horas_restantes -= row["horas"]
+                    itens_promovidos.append(idx)
+                    
+            if itens_promovidos:
+                df.loc[itens_promovidos, "status"] = "Priorizado"
+                
+                # Atualizar justificativa
+                msg = "[Automático: Preenchimento de capacidade restante]"
+                
+                # Tratar justificativa vazia
+                if "justificativa" not in df.columns:
+                    df["justificativa"] = ""
+                    
+                mask_promovidos = df.index.isin(itens_promovidos)
+                
+                # Inicializar se NaN
+                df.loc[mask_promovidos & df["justificativa"].isna(), "justificativa"] = ""
+                
+                # Adicionar mensagem (com espaço extra se já tiver texto)
+                df.loc[mask_promovidos, "justificativa"] = df.loc[mask_promovidos, "justificativa"].apply(
+                    lambda x: (str(x) + " " + msg).strip() if x else msg
+                )
+                
+                self.logger.info(
+                    "greedy_filler_filled",
+                    stage=stage,
+                    items_promoted=len(itens_promovidos),
+                    hours_filled=df.loc[itens_promovidos, "horas"].sum(),
+                    remaining_gap=horas_restantes
+                )
+                
         return df
 
 

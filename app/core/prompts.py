@@ -31,7 +31,7 @@ def build_system_prompt(
     
     # Workflow stage context
     stage_context = ""
-    if workflow_stage:
+    if workflow_stage and isinstance(workflow_stage, str):
         stage_descriptions = {
             "upstream": """\n\n📋 **CONTEXTO: ESTÁGIO UPSTREAM**
 Você está priorizando itens de **Upstream** (descoberta, pesquisa, design, análise).
@@ -56,8 +56,26 @@ NOTA: Idealmente, itens Downstream devem ter passado por Upstream primeiro."""
         }
         stage_context = stage_descriptions.get(workflow_stage, "")
     
-    # Explanation about capacity (already discounted sustentacao)
-    capacity_note = f"""\n\n⚠️ **IMPORTANTE SOBRE CAPACIDADE**: 
+    capacity_note = ""
+    if workflow_stage and isinstance(workflow_stage, dict):
+        # We have specific limits for stages
+        upstream_limit = workflow_stage.get('upstream_limit', 0)
+        downstream_limit = workflow_stage.get('downstream_limit', 0)
+        
+        capacity_note = f"""\n\n⚠️ **IMPORTANTE SOBRE CAPACIDADE POR ESTÁGIO**:
+Você deve respeitar ESTRITAMENTE os limites individuais para cada estágio do workflow:
+
+1. **UPSTREAM (Descoberta/Design)**: Limite MÁXIMO de **{upstream_limit} horas**.
+   - A soma das horas dos itens Upstream priorizados NÃO pode exceder {upstream_limit}h.
+   
+2. **DOWNSTREAM (Implementação)**: Limite MÁXIMO de **{downstream_limit} horas**.
+   - A soma das horas dos itens Downstream priorizados NÃO pode exceder {downstream_limit}h.
+
+Capacidade TOTAL combinada: {capacidade_total} horas.
+A priorização deve respeitar AMBOS os limites individuais e o total."""
+    else:
+        # Legacy behavior or single stage
+        capacity_note = f"""\n\n⚠️ **IMPORTANTE SOBRE CAPACIDADE**: 
 A capacidade informada ({capacidade_total} horas) JÁ DESCONTOU a reserva de sustentação 
 (bugs, hotfixes, suporte técnico não planejado). Você deve priorizar APENAS itens 
 planejados (Upstream ou Downstream) dentro desta capacidade disponível."""
