@@ -1,7 +1,8 @@
-# Prioritization Capability - Spec Delta
+# prioritization Specification
 
-## MODIFIED Requirements
-
+## Purpose
+TBD - created by archiving change add-upstream-downstream-workflow. Update Purpose after archive.
+## Requirements
 ### Requirement: Stage-Aware Prioritization
 The prioritization system SHALL prioritize items separately for each workflow stage.
 
@@ -60,8 +61,6 @@ The LLM prioritization prompts SHALL include workflow stage context.
   - Available capacity for sustentação stage
   - Only sustentação items
 
-## ADDED Requirements
-
 ### Requirement: Workflow Stage Validation in Prioritization
 The prioritization system SHALL validate workflow stage constraints.
 
@@ -99,3 +98,4 @@ The system SHALL handle "Must Have" items within their workflow stage.
 - **AND** has NOT completed upstream
 - **THEN** the system SHALL warn the user
 - **AND** suggest completing upstream first or moving to upstream stage
+

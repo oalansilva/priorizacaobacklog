@@ -61,7 +61,7 @@ The system SHALL track capacity usage per workflow stage.
   - Remaining capacity per stage
   - Usage percentage per stage
 
-## MODIFIED Requirements
+
 
 ### Requirement: System Settings Data Model
 The system settings SHALL include capacity allocation configuration.

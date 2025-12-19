@@ -1,7 +1,8 @@
-# Roadmap Generation Capability - Spec Delta
+# roadmap-generation Specification
 
-## MODIFIED Requirements
-
+## Purpose
+TBD - created by archiving change add-upstream-downstream-workflow. Update Purpose after archive.
+## Requirements
 ### Requirement: Stage-Grouped Roadmap Display
 Roadmaps SHALL display items grouped by workflow stage.
 
@@ -32,8 +33,6 @@ Roadmaps SHALL display items grouped by workflow stage.
 - **THEN** the roadmap SHALL still show the stage section
 - **AND** display "No items prioritized for this stage"
 - **AND** show allocated capacity as unused
-
-## ADDED Requirements
 
 ### Requirement: Workflow Progression Indicator
 Roadmaps SHALL indicate workflow progression and dependencies.
@@ -98,46 +97,3 @@ Historical roadmaps SHALL preserve workflow stage information.
 - **AND** highlight stage transitions
 - **AND** show capacity allocation changes over time
 
-## UI Requirements
-
-### Requirement: Roadmap Stage Visualization
-The roadmap UI SHALL provide clear visual distinction between workflow stages.
-
-#### Scenario: Color-coded stage sections
-- **WHEN** a user views a roadmap
-- **THEN** each stage section SHALL have a distinct color:
-  - Upstream: Blue
-  - Downstream: Green
-  - Sustentação: Orange
-- **AND** items SHALL have matching color badges or borders
-
-#### Scenario: Collapsible stage sections
-- **WHEN** a user views a roadmap with many items
-- **THEN** each stage section SHALL be collapsible
-- **AND** show item count when collapsed
-- **AND** preserve collapse state in user preferences
-
-#### Scenario: Stage capacity visualization
-- **WHEN** a user views a stage section
-- **THEN** the system SHALL display a capacity progress bar
-- **AND** show percentage used
-- **AND** use color coding:
-  - Green: < 80% used
-  - Yellow: 80-100% used
-  - Red: > 100% used (overallocated)
-
-### Requirement: Interactive Roadmap Timeline
-The roadmap timeline SHALL show workflow stage progression.
-
-#### Scenario: Timeline with stage markers
-- **WHEN** a user views a roadmap timeline
-- **THEN** items SHALL be positioned on the timeline
-- **AND** include visual markers for workflow stage
-- **AND** show stage transitions if applicable
-
-#### Scenario: Drag-and-drop stage transition
-- **WHEN** a user drags an item between stage sections
-- **THEN** the system SHALL validate the transition
-- **AND** update the item's workflow_stage
-- **AND** recalculate capacity usage
-- **AND** show confirmation or error message

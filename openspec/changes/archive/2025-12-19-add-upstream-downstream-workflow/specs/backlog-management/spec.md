@@ -47,7 +47,7 @@ The system SHALL enforce workflow stage transition rules.
 - **AND** the item's `upstream_completed_at` is set
 - **THEN** the system SHALL allow the transition
 
-## MODIFIED Requirements
+
 
 ### Requirement: Backlog Item Data Model
 The backlog item data model SHALL include workflow stage information.
