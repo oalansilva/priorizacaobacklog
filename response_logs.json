@@ -1,1 +1,0 @@
-{"errorMessage": "Unable to import module 'main_lambda': No module named 'jose'", "errorType": "Runtime.ImportModuleError", "requestId": "", "stackTrace": []}
